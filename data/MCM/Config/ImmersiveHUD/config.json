@@ -1,0 +1,122 @@
+{
+  "modName": "ImmersiveHUD",
+  "displayName": "$fzIH_ModName",
+  "pluginRequirements": [ "ImmersiveHUD.esp" ],
+  "cursorFillMode": "topToBottom",
+  "pages": [
+    {
+      "pageDisplayName": "$fzIH_PageGeneral",
+      "content": [
+        {
+          "type": "header",
+          "text": "$fzIH_HeaderHUD"
+        },
+        {
+          "type": "header",
+          "text": "$fzIH_HeaderContext"
+        },
+        {
+          "type": "keymap",
+          "text": "$fzIH_ToggleKey",
+          "id": "iToggleKey:Settings",
+          "help": "$fzIH_HelpToggleKey",
+          "ignoreConflicts": true,
+          "valueOptions": {
+            "sourceType": "ModSettingInt",
+            "defaultValue": 45
+          }
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_Crosshair",
+          "id": "bEnabled:Crosshair",
+          "help": "$fzIH_HelpCrosshair",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": true
+          }
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_HoldMode",
+          "id": "bHoldMode:Settings",
+          "help": "$fzIH_HelpHoldMode",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": false
+          }
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_SneakMeter",
+          "id": "bEnabled:SneakMeter",
+          "help": "$fzIH_HelpSneakMeter",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": true
+          }
+        },
+        {
+          "type": "slider",
+          "text": "$fzIH_FadeSpeed",
+          "id": "fFadeSpeed:Settings",
+          "help": "$fzIH_HelpFadeSpeed",
+          "valueOptions": {
+            "sourceType": "ModSettingFloat",
+            "defaultValue": 5.0,
+            "min": 0.1,
+            "max": 50.0,
+            "step": 0.1,
+            "formatString": "{1}"
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_ShowWeapon",
+          "id": "bShowWeaponDrawn:Settings",
+          "help": "$fzIH_HelpShowWeapon",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": true
+          }
+        },
+        {
+          "type": "header",
+          "text": "$fzIH_HeaderDebug"
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_ShowCombat",
+          "id": "bShowInCombat:Settings",
+          "help": "$fzIH_HelpShowCombat",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": true
+          }
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_DebugMode",
+          "id": "bDebugMode:Settings",
+          "help": "$fzIH_HelpDebugMode",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": false
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$fzIH_PageWidgets",
+      "content": [
+        {
+          "type": "text",
+          "text": "$fzIH_WidgetNewFound"
+        }
+      ]
+    }
+  ]
+}

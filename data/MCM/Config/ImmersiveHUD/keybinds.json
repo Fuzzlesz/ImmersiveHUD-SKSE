@@ -1,0 +1,14 @@
+{
+    "modName": "ImmersiveHUD",
+    "keybinds": [
+        {
+            "id": "iToggleKey",
+            "desc": "Toggle HUD Visibility",
+            "action": {
+                "type": "SendEvent",
+                "form": "ImmersiveHUD.esp|800",
+                "scriptName": "ImmersiveHUD_MCM"
+            }
+        }
+    ]
+}

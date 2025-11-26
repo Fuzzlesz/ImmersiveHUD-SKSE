@@ -1,0 +1,258 @@
+#include "Utils.h"
+#include "Settings.h"
+#include <unordered_set>
+
+namespace Utils
+{
+	std::string SanitizeName(const std::string& a_name)
+	{
+		std::string clean = a_name;
+		for (char& c : clean) {
+			if (!isalnum(static_cast<unsigned char>(c))) {
+				c = '_';
+			}
+		}
+		return clean;
+	}
+
+	std::string UrlDecode(const std::string& a_src)
+	{
+		std::string ret;
+		ret.reserve(a_src.length());
+		unsigned int ii;
+
+		for (size_t i = 0; i < a_src.length(); i++) {
+			if (a_src[i] == '%') {
+				if (i + 2 < a_src.length()) {
+					if (sscanf_s(a_src.substr(i + 1, 2).c_str(), "%x", &ii) != EOF) {
+						ret += static_cast<char>(ii);
+						i = i + 2;
+						continue;
+					}
+				}
+			}
+			ret += (a_src[i] == '+') ? ' ' : a_src[i];
+		}
+		return ret;
+	}
+
+	std::string ExtractFilename(std::string a_path)
+	{
+		if (a_path.empty()) {
+			return "";
+		}
+
+		std::replace(a_path.begin(), a_path.end(), '\\', '/');
+
+		size_t lastSlash = a_path.rfind('/');
+		if (lastSlash != std::string::npos) {
+			a_path = a_path.substr(lastSlash + 1);
+		}
+
+		size_t lastDot = a_path.rfind('.');
+		if (lastDot != std::string::npos) {
+			a_path = a_path.substr(0, lastDot);
+		}
+
+		if (!a_path.empty()) {
+			a_path[0] = static_cast<char>(toupper(static_cast<unsigned char>(a_path[0])));
+		}
+
+		return a_path;
+	}
+
+	std::string GetWidgetDisplayName(const std::string& a_rawPath, const std::string& a_source)
+	{
+		// 1. Try to get a clean name from the Source URL (e.g., "meter.swf" -> "Meter").
+		std::string name = ExtractFilename(a_source);
+
+		// 2. If the Source was generic or missing (e.g. "Internal/SkyUI Widget"), we might get "Widget" or "SkyUI Widget".
+		// If it's too generic or empty, fall back to parsing the path.
+		bool isGeneric = name.empty() || name == "Unknown" || name == "Hudmenu";
+
+		if (isGeneric) {
+			// Check if it's a specific SkyUI container.
+			if (a_rawPath.find("WidgetContainer") != std::string::npos) {
+				// Parse "_root.WidgetContainer.10" -> "SkyUI Widget 10".
+				size_t lastDot = a_rawPath.rfind('.');
+				if (lastDot != std::string::npos && lastDot + 1 < a_rawPath.length()) {
+					return "SkyUI Widget " + a_rawPath.substr(lastDot + 1);
+				}
+			}
+
+			// Fallback: Use the path filename.
+			name = ExtractFilename(a_rawPath);
+		}
+
+		// 3. Final safety check.
+		if (name.empty()) {
+			return "Unknown Widget";
+		}
+
+		return name;
+	}
+
+	bool IsSystemMenu(const std::string& a_menuName)
+	{
+		static const std::unordered_set<std::string> systemMenus = {
+			"Console", "MapMenu", "InventoryMenu", "MagicMenu", "Journal Menu",
+			"TweenMenu", "Sleep/Wait Menu", "BarterMenu", "GiftMenu", "ContainerMenu",
+			"Lockpicking Menu", "Book Menu", "StatsMenu", "LevelUp Menu", "Crafting Menu",
+			"FavoritesMenu", "Mod Manager Menu", "Creation Club Menu", "TitleSequence Menu",
+			"Loading Menu", "Fader Menu", "Main Menu", "Mist Menu", "LoadWaitSpinner",
+			"Dialogue Menu", "MessageBoxMenu", "Cursor Menu", "Top Menu", "SafeZoneMenu",
+			"Credits Menu", "Tutorial Menu", "RaceSex Menu", "Kinect Menu",
+			"Console Native UI Menu", "CustomMenu", "CPECustomMenu", "PluginExplorerMenu"
+		};
+		return systemMenus.contains(a_menuName);
+	}
+
+	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie)
+	{
+		if (!a_movie) {
+			return "Unknown";
+		}
+		RE::GFxValue root;
+		if (a_movie->GetVariable(&root, "_root")) {
+			RE::GFxValue urlVal;
+			if (root.GetMember("_url", &urlVal) && urlVal.IsString()) {
+				return urlVal.GetString();
+			}
+		}
+		return "Unknown";
+	}
+
+	// ==========================================
+	// DebugVisitor
+	// ==========================================
+
+	DebugVisitor::DebugVisitor(std::string a_prefix, int a_depth) :
+		_prefix(std::move(a_prefix)),
+		_depth(a_depth)
+	{}
+
+	void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
+	{
+		if (!a_name) {
+			return;
+		}
+		std::string name(a_name);
+
+		static const std::unordered_set<std::string> skipList = { "QuestItemList", "parent", "stage" };
+		if (skipList.contains(name) || name.starts_with("instance")) {
+			return;
+		}
+
+		std::string typeStr = a_val.IsDisplayObject() ? "[DisplayObject] " : (a_val.IsArray() ? "[Array] " : "[Other] ");
+
+		std::string sourceInfo;
+		if (a_val.IsDisplayObject()) {
+			RE::GFxValue urlVal;
+			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
+				sourceInfo = " [Source: " + std::string(urlVal.GetString()) + "]";
+			}
+		}
+
+		logger::info("{}{}.{}{}", typeStr, _prefix, name, sourceInfo);
+
+		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
+			DebugVisitor subVisitor(_prefix + "." + name, _depth - 1);
+			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
+		}
+	}
+
+	// ==========================================
+	// ContainerDiscoveryVisitor
+	// ==========================================
+
+	ContainerDiscoveryVisitor::ContainerDiscoveryVisitor(int& a_count, bool& a_changes, std::string a_pathPrefix, int a_depth) :
+		_count(a_count),
+		_changes(a_changes),
+		_pathPrefix(std::move(a_pathPrefix)),
+		_depth(a_depth)
+	{}
+
+	void ContainerDiscoveryVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
+	{
+		if (!a_name) {
+			return;
+		}
+		std::string name(a_name);
+
+		// Block volatile or internal containers to prevent crashes and scanning junk.
+		if (name == "markerData" ||
+			name == "widgetLoaderContainer" ||
+			name == "QuestItemList" ||
+			name == "HUDMovieBaseInstance") {
+			return;
+		}
+
+		std::string currentPath = _pathPrefix + "." + name;
+
+		if (name == "WidgetContainer") {
+			ScanArrayContainer(currentPath, a_val);
+			return;
+		}
+
+		if (a_val.IsDisplayObject()) {
+			RE::GFxValue urlVal;
+			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
+				std::string url = urlVal.GetString();
+				if (!url.ends_with("hudmenu.swf") && !url.ends_with("HUDMenu.swf")) {
+					if (Settings::GetSingleton()->AddDiscoveredPath(currentPath, url)) {
+						_changes = true;
+						_count++;
+						logger::info("Discovered Element: {} [Source: {}]", currentPath, url);
+					}
+					return;
+				}
+			}
+		}
+
+		if (_depth < 2 && (a_val.IsDisplayObject() || a_val.IsObject())) {
+			ContainerDiscoveryVisitor subVisitor(_count, _changes, currentPath, _depth + 1);
+			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
+		}
+	}
+
+	void ContainerDiscoveryVisitor::ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container)
+	{
+		for (int i = 0; i < 128; i++) {
+			RE::GFxValue entry;
+			std::string indexStr = std::to_string(i);
+
+			if (!const_cast<RE::GFxValue&>(a_container).GetMember(indexStr.c_str(), &entry)) {
+				continue;
+			}
+			if (!entry.IsObject()) {
+				continue;
+			}
+
+			RE::GFxValue widget;
+			if (!entry.GetMember("widget", &widget)) {
+				if (entry.IsDisplayObject()) {
+					widget = entry;
+				} else {
+					continue;
+				}
+			}
+			if (!widget.IsDisplayObject()) {
+				continue;
+			}
+
+			std::string widgetPath = a_path + "." + indexStr;
+			std::string url = "Internal/SkyUI Widget";
+
+			RE::GFxValue urlVal;
+			if (widget.GetMember("_url", &urlVal) && urlVal.IsString()) {
+				url = urlVal.GetString();
+			}
+
+			if (Settings::GetSingleton()->AddDiscoveredPath(widgetPath, url)) {
+				_changes = true;
+				_count++;
+				logger::info("Discovered SkyUI Element: {} [Source: {}]", widgetPath, url);
+			}
+		}
+	}
+}
