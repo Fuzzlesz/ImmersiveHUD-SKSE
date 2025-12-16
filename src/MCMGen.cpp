@@ -276,7 +276,6 @@ namespace MCMGen
 			// 7. Inject into JSON
 			json* widgetsContent = nullptr;
 			for (auto& page : config["pages"]) {
-				// STRICT: Only checks for localization key
 				if (page.value("pageDisplayName", "") == "$fzIH_PageGeneral") {
 					for (auto& item : page["content"]) {
 						if (item.contains("id")) {
@@ -289,7 +288,6 @@ namespace MCMGen
 					}
 				}
 
-				// STRICT: Only checks for localization key
 				if (page.value("pageDisplayName", "") == "$fzIH_PageWidgets") {
 					widgetsContent = &page["content"];
 				}
@@ -300,9 +298,8 @@ namespace MCMGen
 				if (relaunchNeeded) {
 					widgetsContent->push_back({ { "text", "$fzIH_WidgetNewFound" }, { "type", "text" }, { "id", "WidStatus" } });
 				} else {
-					std::string countStr = std::to_string(finalWidgetsMap.size());
-					std::string statusText = "<font color='#00FF00'>$fzIH_StatusPrefix " + countStr + " $fzIH_StatusSuffix</font>";
-					widgetsContent->push_back({ { "text", statusText }, { "type", "text" }, { "id", "WidStatus" } });
+					widgetsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },
+						{ "type", "text" }, { "id", "WidStatus" } });
 				}
 				widgetsContent->push_back({ { "type", "header" } });  // Empty header acts as a spacer
 				for (const auto& [id, widgetJson] : finalWidgetsMap) {
