@@ -26,6 +26,10 @@ public:
 		const auto settings = Settings::GetSingleton();
 		const auto key = settings->GetToggleKey();
 
+		if (key == static_cast<std::uint32_t>(-1)) {
+			return RE::BSEventNotifyControl::kContinue;
+		}
+
 		for (auto event = *a_event; event; event = event->next) {
 			if (const auto button = event->AsButtonEvent()) {
 				if (button->GetIDCode() == key) {
