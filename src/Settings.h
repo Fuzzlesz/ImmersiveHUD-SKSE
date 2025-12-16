@@ -45,8 +45,8 @@ public:
 private:
 	std::uint32_t _toggleKey = 0x2D;
 	bool _holdMode = false;
-	bool _alwaysShowInCombat = true;
-	bool _alwaysShowWeaponDrawn = true;
+	bool _alwaysShowInCombat = false;
+	bool _alwaysShowWeaponDrawn = false;
 	float _fadeSpeed = 5.0f;
 	bool _dumpHUD = false;
 
