@@ -54,8 +54,6 @@ public:
 	{
 		if (a_event && a_event->menuName == "Journal Menu") {
 			if (a_event->opening) {
-				// Ensures SkyUI late widgets are removed from MCM immediately if uninstalled.
-				HUDManager::GetSingleton()->ForceScan();
 			} else {
 				// Reload settings when leaving the menu to apply any changes made.
 				Settings::GetSingleton()->Load();
@@ -157,14 +155,18 @@ void HUDManager::ScanIfReady()
 
 void HUDManager::ForceScan()
 {
-	// Triggered via Journal Menu Open.
-	// Synchronous scan to ensure file write happens before MCM load.
+	// Can still be called manually if needed, but not attached to Journal anymore.
 	ScanForWidgets(true);
 }
 
 void HUDManager::OnButtonDown()
 {
-	if (Settings::GetSingleton()->IsDebugMode()) {
+	// Scan whenever the button is pressed.
+	// We pass 'false' for forceUpdate so it only logs if new widgets are found.
+	SKSE::GetTaskInterface()->AddUITask([this]() {
+		ScanForWidgets(false);
+	});
+
 	if (Settings::GetSingleton()->IsDumpHUDEnabled()) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			DumpHUDStructure();
