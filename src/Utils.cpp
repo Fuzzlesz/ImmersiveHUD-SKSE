@@ -131,14 +131,14 @@ namespace Utils
 		_depth(a_depth)
 	{}
 
-	void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
+void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
 	{
 		if (!a_name) {
 			return;
 		}
 		std::string name(a_name);
 
-		static const std::unordered_set<std::string> skipList = { "QuestItemList", "parent", "stage" };
+		static const std::unordered_set<std::string> skipList = { "aCompassMarkerList" };
 		if (skipList.contains(name) || name.starts_with("instance")) {
 			return;
 		}
@@ -182,8 +182,8 @@ namespace Utils
 		// Block volatile or internal containers to prevent crashes and scanning junk.
 		if (name == "markerData" ||
 			name == "widgetLoaderContainer" ||
-			name == "QuestItemList" ||
-			name == "HUDMovieBaseInstance") {
+			name == "HUDMovieBaseInstance" ||
+			name == "aCompassMarkerList") {
 			return;
 		}
 
