@@ -165,6 +165,7 @@ void HUDManager::ForceScan()
 void HUDManager::OnButtonDown()
 {
 	if (Settings::GetSingleton()->IsDebugMode()) {
+	if (Settings::GetSingleton()->IsDumpHUDEnabled()) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			DumpHUDStructure();
 		});

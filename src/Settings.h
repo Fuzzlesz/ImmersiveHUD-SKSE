@@ -30,7 +30,7 @@ public:
 	[[nodiscard]] bool IsAlwaysShowInCombat() const { return _alwaysShowInCombat; }
 	[[nodiscard]] bool IsAlwaysShowWeaponDrawn() const { return _alwaysShowWeaponDrawn; }
 	[[nodiscard]] float GetFadeSpeed() const { return _fadeSpeed; }
-	[[nodiscard]] bool IsDebugMode() const { return _debugMode; }
+	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
 
@@ -48,7 +48,7 @@ private:
 	bool _alwaysShowInCombat = true;
 	bool _alwaysShowWeaponDrawn = true;
 	float _fadeSpeed = 5.0f;
-	bool _debugMode = false;
+	bool _dumpHUD = false;
 
 	CrosshairSettings _crosshair;
 	SneakMeterSettings _sneakMeter;

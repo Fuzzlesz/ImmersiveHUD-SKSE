@@ -99,9 +99,9 @@
         },
         {
           "type": "toggle",
-          "text": "$fzIH_DebugMode",
-          "id": "bDebugMode:Settings",
-          "help": "$fzIH_HelpDebugMode",
+          "text": "$fzIH_DumpHUD",
+          "id": "bDumpHUD:Settings",
+          "help": "$fzIH_HelpDumpHUD",
           "valueOptions": {
             "sourceType": "ModSettingBool",
             "defaultValue": false
