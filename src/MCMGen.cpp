@@ -114,7 +114,7 @@ namespace MCMGen
 		std::string prettyName;
 	};
 
-	void Update()
+	void Update(bool a_isRuntime)
 	{
 		const fs::path configDir = "Data/MCM/Config/ImmersiveHUD";
 		const fs::path configPath = configDir / "config.json";
@@ -295,7 +295,7 @@ namespace MCMGen
 
 			if (widgetsContent) {
 				widgetsContent->clear();
-				if (relaunchNeeded) {
+				if (relaunchNeeded && !a_isRuntime) {
 					widgetsContent->push_back({ { "text", "$fzIH_WidgetNewFound" }, { "type", "text" }, { "id", "WidStatus" } });
 				} else {
 					widgetsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },

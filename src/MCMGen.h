@@ -6,5 +6,5 @@ namespace MCMGen
 	void ResetSession();
 
 	// Updates the JSON with current settings/cache.
-	void Update();
+	void Update(bool a_isRuntime = false);
 }
