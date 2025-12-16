@@ -380,7 +380,7 @@ void HUDManager::Update(float a_delta)
 		}
 		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, _prevDelta * settings->GetFadeSpeed());
 	} else {
-		_ctxAlpha = std::lerp(_ctxAlpha, _currentAlpha, _prevDelta * settings->GetFadeSpeed());
+		_ctxAlpha = _currentAlpha;
 	}
 
 	ApplyAlphaToHUD(_currentAlpha);
