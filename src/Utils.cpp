@@ -2,7 +2,7 @@
 #include "Settings.h"
 #include <unordered_set>
 
-namespace Utils
+	namespace Utils
 {
 	std::string SanitizeName(const std::string& a_name)
 	{
@@ -131,31 +131,53 @@ namespace Utils
 		_depth(a_depth)
 	{}
 
-void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
+	void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
 	{
 		if (!a_name) {
 			return;
 		}
 		std::string name(a_name);
 
-		static const std::unordered_set<std::string> skipList = { "aCompassMarkerList" };
-		if (skipList.contains(name) || name.starts_with("instance")) {
+	static const std::unordered_set<std::string> kSkipList = {
+		"aCompassMarkerList"
+	};
+
+	if (kSkipList.contains(name) || name.starts_with("instance")) {
 			return;
 		}
 
-		std::string typeStr = a_val.IsDisplayObject() ? "[DisplayObject] " : (a_val.IsArray() ? "[Array] " : "[Other] ");
-
-		std::string sourceInfo;
+	// Only log DisplayObjects with detailed alpha/visible information
 		if (a_val.IsDisplayObject()) {
+			std::string sourceInfo;
 			RE::GFxValue urlVal;
-			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
-				sourceInfo = " [Source: " + std::string(urlVal.GetString()) + "]";
+
+			// We need mutable access to call GetMember
+			auto& obj = const_cast<RE::GFxValue&>(a_val);
+
+			if (obj.GetMember("_url", &urlVal) && urlVal.IsString()) {
+				sourceInfo = "[Source: " + std::string(urlVal.GetString()) + "] ";
 			}
+
+			// Get Alpha
+			RE::GFxValue alphaVal;
+			double alpha = 0.0;
+			if (obj.GetMember("_alpha", &alphaVal) && alphaVal.IsNumber()) {
+				alpha = alphaVal.GetNumber();
+			}
+
+			// Get Visible
+			RE::GFxValue visVal;
+			std::string visStr = "?";
+			if (obj.GetMember("_visible", &visVal) && visVal.IsBool()) {
+				visStr = visVal.GetBool() ? "TRUE" : "FALSE";
+			}
+
+			// Log format: [Source] [DisplayObject] [A=000.0] [V=TRUE] Path
+			logger::info("{}[DisplayObject] [A={:05.1f}] [V={}] {}.{}", sourceInfo, alpha, visStr, _prefix, name);
 		}
 
-		logger::info("{}{}.{}{}", typeStr, _prefix, name, sourceInfo);
-
-		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
+	// Recurse into DisplayObjects and Arrays only (not generic Objects)
+	if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
 			DebugVisitor subVisitor(_prefix + "." + name, _depth - 1);
 			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
 		}
