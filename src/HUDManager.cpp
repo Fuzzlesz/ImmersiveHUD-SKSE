@@ -404,7 +404,7 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 	float targetAlpha = 0.0f;
 
 	if (RE::PlayerCharacter::GetSingleton()->IsSneaking()) {
-		if (widgetMode == Settings::kVisible) {
+		if (widgetMode == Settings::kIgnored) {
 			targetAlpha = 100.0f;
 		} else if (widgetMode == Settings::kImmersive) {
 			if (settings->GetSneakMeterSettings().enabled) {
@@ -606,7 +606,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			continue;
 		}
 
-		if (mode == Settings::kVisible) {
+		if (mode == Settings::kIgnored) {
 			elem.SetMember("_alpha", 100.0);
 		} else if (mode == Settings::kHidden) {
 			elem.SetMember("_visible", false);
@@ -646,7 +646,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		int mode = settings->GetWidgetMode(menuNameStr);
 
-		if (mode == Settings::kVisible) {
+		if (mode == Settings::kIgnored) {
 			if (!entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(true);
 			}
