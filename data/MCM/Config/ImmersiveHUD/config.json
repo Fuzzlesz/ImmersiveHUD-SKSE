@@ -18,7 +18,7 @@
         {
           "type": "keymap",
           "text": "$fzIH_ToggleKey",
-          "id": "iToggleKey:Settings",
+          "id": "iToggleKey:HUD",
           "help": "$fzIH_HelpToggleKey",
           "ignoreConflicts": true,
           "valueOptions": {
@@ -39,7 +39,7 @@
         {
           "type": "toggle",
           "text": "$fzIH_HoldMode",
-          "id": "bHoldMode:Settings",
+          "id": "bHoldMode:HUD",
           "help": "$fzIH_HelpHoldMode",
           "valueOptions": {
             "sourceType": "ModSettingBool",
@@ -59,7 +59,7 @@
         {
           "type": "slider",
           "text": "$fzIH_FadeSpeed",
-          "id": "fFadeSpeed:Settings",
+          "id": "fFadeSpeed:HUD",
           "help": "$fzIH_HelpFadeSpeed",
           "valueOptions": {
             "sourceType": "ModSettingFloat",
@@ -76,7 +76,7 @@
         {
           "type": "toggle",
           "text": "$fzIH_ShowWeapon",
-          "id": "bShowWeaponDrawn:Settings",
+          "id": "bShowWeaponDrawn:HUD",
           "help": "$fzIH_HelpShowWeapon",
           "valueOptions": {
             "sourceType": "ModSettingBool",
@@ -90,7 +90,7 @@
         {
           "type": "toggle",
           "text": "$fzIH_ShowCombat",
-          "id": "bShowInCombat:Settings",
+          "id": "bShowInCombat:HUD",
           "help": "$fzIH_HelpShowCombat",
           "valueOptions": {
             "sourceType": "ModSettingBool",
@@ -100,7 +100,7 @@
         {
           "type": "toggle",
           "text": "$fzIH_DumpHUD",
-          "id": "bDumpHUD:Settings",
+          "id": "bDumpHUD:HUD",
           "help": "$fzIH_HelpDumpHUD",
           "valueOptions": {
             "sourceType": "ModSettingBool",
