@@ -180,7 +180,6 @@ namespace MCMGen
 			// 3a. From Skeleton (Persistence)
 			if (loadedSkeleton) {
 				for (const auto& page : config["pages"]) {
-					// STRICT: Only checks for localization key
 					std::string pName = page.value("pageDisplayName", "");
 					if (pName == "$fzIH_PageWidgets" && page.contains("content")) {
 						for (const auto& item : page["content"]) {
