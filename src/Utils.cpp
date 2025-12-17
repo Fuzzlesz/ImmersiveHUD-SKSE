@@ -183,7 +183,8 @@ void DebugVisitor::Visit(const char* a_name, const RE::GFxValue& a_val)
 		if (name == "markerData" ||
 			name == "widgetLoaderContainer" ||
 			name == "HUDMovieBaseInstance" ||
-			name == "aCompassMarkerList") {
+			name == "aCompassMarkerList" ||
+			name == "HUDHooksContainer") {
 			return;
 		}
 
