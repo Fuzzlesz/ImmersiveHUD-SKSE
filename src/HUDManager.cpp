@@ -1,71 +1,9 @@
 #include "HUDManager.h"
+#include "Events.h"
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
 #include <numbers>
-
-// ==========================================
-// Event Handlers
-// ==========================================
-
-class InputHandler : public RE::BSTEventSink<RE::InputEvent*>
-{
-public:
-	static InputHandler* GetSingleton()
-	{
-		static InputHandler singleton;
-		return &singleton;
-	}
-
-	RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, [[maybe_unused]] RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override
-	{
-		if (!a_event || !*a_event) {
-			return RE::BSEventNotifyControl::kContinue;
-		}
-
-		const auto settings = Settings::GetSingleton();
-		const auto key = settings->GetToggleKey();
-
-		if (key == static_cast<std::uint32_t>(-1)) {
-			return RE::BSEventNotifyControl::kContinue;
-		}
-
-		for (auto event = *a_event; event; event = event->next) {
-			if (const auto button = event->AsButtonEvent()) {
-				if (button->GetIDCode() == key) {
-					if (button->IsDown()) {
-						HUDManager::GetSingleton()->OnButtonDown();
-					} else if (button->IsUp()) {
-						HUDManager::GetSingleton()->OnButtonUp();
-					}
-				}
-			}
-		}
-		return RE::BSEventNotifyControl::kContinue;
-	}
-};
-
-class MenuHandler : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
-{
-public:
-	static MenuHandler* GetSingleton()
-	{
-		static MenuHandler singleton;
-		return &singleton;
-	}
-
-	RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override
-	{
-		if (a_event && a_event->menuName == "Journal Menu") {
-			if (a_event->opening) {
-			} else {
-				// Reload settings when leaving the menu to apply any changes made.
-				Settings::GetSingleton()->Load();
-			}
-		}
-		return RE::BSEventNotifyControl::kContinue;
-	}
-};
 
 // ==========================================
 // Hooks
@@ -100,15 +38,8 @@ struct StealthMeterHook
 
 void HUDManager::InstallHooks()
 {
-	auto* deviceManager = RE::BSInputDeviceManager::GetSingleton();
-	if (deviceManager) {
-		deviceManager->AddEventSink(InputHandler::GetSingleton());
-	}
-
-	auto* ui = RE::UI::GetSingleton();
-	if (ui) {
-		ui->AddEventSink<RE::MenuOpenCloseEvent>(MenuHandler::GetSingleton());
-	}
+	Events::InputEventSink::Register();
+	Events::MenuOpenCloseEventSink::Register();
 
 	stl::write_vfunc<RE::PlayerCharacter, PlayerUpdateHook>();
 	stl::write_vfunc<RE::StealthMeter, StealthMeterHook>();
