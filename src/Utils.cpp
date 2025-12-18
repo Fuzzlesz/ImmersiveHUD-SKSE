@@ -1,7 +1,7 @@
 #include "Utils.h"
 #include "Settings.h"
 
-	namespace Utils
+namespace Utils
 {
 	std::string SanitizeName(const std::string& a_name)
 	{
@@ -137,15 +137,15 @@
 		}
 		std::string name(a_name);
 
-	static const std::unordered_set<std::string> kSkipList = {
-		"aCompassMarkerList"
-	};
+		static const std::unordered_set<std::string> kSkipList = {
+			"aCompassMarkerList"
+		};
 
-	if (kSkipList.contains(name) || name.starts_with("instance")) {
+		if (kSkipList.contains(name) || name.starts_with("instance")) {
 			return;
 		}
 
-	// Only log DisplayObjects with detailed alpha/visible information
+		// Only log DisplayObjects with detailed alpha/visible information
 		if (a_val.IsDisplayObject()) {
 			std::string sourceInfo;
 			RE::GFxValue urlVal;
@@ -175,8 +175,8 @@
 			logger::info("{}[DisplayObject] [A={:05.1f}] [V={}] {}.{}", sourceInfo, alpha, visStr, _prefix, name);
 		}
 
-	// Recurse into DisplayObjects and Arrays only (not generic Objects)
-	if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
+		// Recurse into DisplayObjects and Arrays only (not generic Objects)
+		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
 			DebugVisitor subVisitor(_prefix + "." + name, _depth - 1);
 			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
 		}
@@ -201,38 +201,48 @@
 		std::string name(a_name);
 
 		// Block volatile or internal containers to prevent crashes and scanning junk.
-		if (name == "markerData" ||
-			name == "widgetLoaderContainer" ||
-			name == "HUDMovieBaseInstance" ||
-			name == "aCompassMarkerList" ||
-			name == "HUDHooksContainer") {
+		static const std::unordered_set<std::string> kBlockList = {
+			"markerData",
+			"widgetLoaderContainer",
+			"HUDMovieBaseInstance",
+			"aCompassMarkerList",
+			"HUDHooksContainer"
+		};
+
+		if (kBlockList.contains(name)) {
 			return;
 		}
 
 		std::string currentPath = _pathPrefix + "." + name;
 
+		// Special handling for SkyUI WidgetContainer
 		if (name == "WidgetContainer") {
 			ScanArrayContainer(currentPath, a_val);
 			return;
 		}
 
+		// Check if this is a discoverable widget
 		if (a_val.IsDisplayObject()) {
 			RE::GFxValue urlVal;
 			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
 				std::string url = urlVal.GetString();
+
+				// Skip the HUD menu itself
 				if (!url.ends_with("hudmenu.swf") && !url.ends_with("HUDMenu.swf")) {
 					if (Settings::GetSingleton()->AddDiscoveredPath(currentPath, url)) {
 						_changes = true;
 						_count++;
 						logger::info("Discovered Element: {} [Source: {}]", currentPath, url);
 					}
+					// Don't recurse into discovered widgets - we've found what we need
 					return;
 				}
 			}
 		}
 
-		if (_depth < 2 && (a_val.IsDisplayObject() || a_val.IsObject())) {
-			ContainerDiscoveryVisitor subVisitor(_count, _changes, currentPath, _depth + 1);
+		// Recurse into DisplayObjects and Arrays only (not generic Objects)
+		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
+			ContainerDiscoveryVisitor subVisitor(_count, _changes, currentPath, _depth - 1);
 			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
 		}
 	}
