@@ -25,7 +25,7 @@ void Settings::Load()
 	_holdMode = ini.GetBoolValue(sectionHUD, "bHoldMode", false);
 	_alwaysShowInCombat = ini.GetBoolValue(sectionHUD, "bShowInCombat", false);
 	_alwaysShowWeaponDrawn = ini.GetBoolValue(sectionHUD, "bShowWeaponDrawn", false);
-	_fadeSpeed = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fFadeSpeed", 5.0));
+	_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));
 	_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
 
 	_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);

@@ -59,15 +59,15 @@
         {
           "type": "slider",
           "text": "$fzIH_FadeSpeed",
-          "id": "fFadeSpeed:HUD",
+          "id": "iFadeSpeed:HUD",
           "help": "$fzIH_HelpFadeSpeed",
           "valueOptions": {
-            "sourceType": "ModSettingFloat",
-            "defaultValue": 5.0,
-            "min": 0.1,
-            "max": 50.0,
-            "step": 0.1,
-            "formatString": "{1}"
+            "sourceType": "ModSettingInt",
+            "defaultValue": 5,
+            "min": 1,
+            "max": 50,
+            "step": 1,
+            "formatString": "{0}"
           }
         },
         {
