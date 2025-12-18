@@ -120,15 +120,3 @@ const std::set<std::string>& Settings::GetSubWidgetPaths() const
 {
 	return _subWidgetPaths;
 }
-
-void OnConfigClose(RE::StaticFunctionTag*)
-{
-	logger::info("MCM menu closed. Reloading settings...");
-	Settings::GetSingleton()->Load();
-}
-
-bool Settings::RegisterPapyrus(RE::BSScript::IVirtualMachine* a_vm)
-{
-	a_vm->RegisterFunction("OnConfigClose", "ImmersiveHUD_MCM", OnConfigClose);
-	return true;
-}

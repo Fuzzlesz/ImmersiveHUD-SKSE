@@ -40,8 +40,6 @@ public:
 	[[nodiscard]] const CrosshairSettings& GetCrosshairSettings() const { return _crosshair; }
 	[[nodiscard]] const SneakMeterSettings& GetSneakMeterSettings() const { return _sneakMeter; }
 
-	static bool RegisterPapyrus(RE::BSScript::IVirtualMachine* a_vm);
-
 private:
 	std::uint32_t _toggleKey = 0x2D;
 	bool _holdMode = false;

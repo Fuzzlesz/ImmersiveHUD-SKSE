@@ -123,12 +123,6 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_s
 	if (!messaging->RegisterListener(OnInit)) {
 		return false;
 	}
-
-	const auto papyrus = SKSE::GetPapyrusInterface();
-	if (!papyrus->Register(Settings::RegisterPapyrus)) {
-		logger::critical("Failed to register papyrus callback");
-		return false;
-	}
-
+	
 	return true;
 }
