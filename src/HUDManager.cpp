@@ -1,5 +1,6 @@
 #include "HUDManager.h"
 #include "Events.h"
+#include "HUDElements.h"
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -401,12 +402,22 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate)
 	int containerCount = 0;
 	auto* settings = Settings::GetSingleton();
 
-	// Manual registration.
-	if (settings->AddDiscoveredPath("_root.HUDMovieBaseInstance.StealthMeterInstance", "Internal/StealthMeter")) {
-		changes = true;
+	auto hud = ui->GetMenu("HUD Menu");
+	RE::GFxMovieView* hudMovie = (hud && hud->uiMovie) ? hud->uiMovie.get() : nullptr;
+
+	if (hudMovie) {
+		for (const auto& def : HUDElements::Get()) {
+			for (const auto& path : def.paths) {
+				RE::GFxValue test;
+				if (hudMovie->GetVariable(&test, path)) {
+					if (settings->AddDiscoveredPath(path, "Internal/Vanilla")) {
+						changes = true;
+					}
+				}
+			}
+		}
 	}
 
-	// Scan external menus.
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
 			continue;
@@ -425,15 +436,14 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate)
 		}
 	}
 
-	// Scan internal HUD.
-	auto hud = ui->GetMenu("HUD Menu");
-	if (hud && hud->uiMovie) {
-		ScanForContainers(hud->uiMovie.get(), containerCount, changes);
+	if (hudMovie) {
+		ScanForContainers(hudMovie, containerCount, changes);
 	}
 
 	if (changes || a_forceUpdate) {
-		MCMGen::Update(_loadGracePeriod <= 0.0f);
+		Settings::GetSingleton()->Load();
 
+		MCMGen::Update(_loadGracePeriod <= 0.0f);
 		if (changes) {
 			logger::info("Scan complete: Found {} external, {} internal.", externalCount, containerCount);
 		}
@@ -468,67 +478,61 @@ void HUDManager::DumpHUDStructure()
 void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha)
 {
 	const auto settings = Settings::GetSingleton();
-	static const std::vector<const char*> kBaseElements = {
-		"_root.HUDMovieBaseInstance.CompassShoutMeterHolder",
-		"_root.HUDMovieBaseInstance.Health",
-		"_root.HUDMovieBaseInstance.Magica",
-		"_root.HUDMovieBaseInstance.Stamina",
-		"_root.HUDMovieBaseInstance.EnemyHealth_mc",
-		"_root.HUDMovieBaseInstance.ChargeMeterBaseAlt",
-		"_root.HUDMovieBaseInstance.RolloverName_mc",
-		"_root.HUDMovieBaseInstance.RolloverInfo_mc",
-		"_root.HUDMovieBaseInstance.ArrowInfoInstance",
-		"_root.HUDMovieBaseInstance.FavorBackButtonBase"
-	};
+	static std::unordered_set<std::string> vanillaPaths;
 
-	RE::GFxValue root;
-	if (!a_movie->GetVariable(&root, "_root")) {
-		return;
-	}
+	for (const auto& def : HUDElements::Get()) {
+		if (strcmp(def.id, "iMode_StealthMeter") == 0) {
+			for (const auto& path : def.paths) vanillaPaths.insert(path);
+			continue;
+		}
 
-	for (const auto& path : kBaseElements) {
-		RE::GFxValue elem;
-		if (a_movie->GetVariable(&elem, path)) {
+		for (const auto& path : def.paths) {
+			vanillaPaths.insert(path);
+
+			int mode = settings->GetWidgetMode(path);
 			RE::GFxValue::DisplayInfo dInfo;
-			dInfo.SetAlpha(a_globalAlpha);
-			elem.SetDisplayInfo(dInfo);
+			bool setVisible = true;
+			double setAlpha = 100.0;
+
+				if (def.isCrosshair) {
+					if (mode == Settings::kHidden) {
+						setVisible = false;
+						setAlpha = 0.0;
+					} else if (mode == Settings::kIgnored) {
+						setAlpha = 100.0;
+					} else {
+						float alpha = (_ctxAlpha * 0.01f * 100.0f);
+						if (CompatibilityCheck_SmoothCam() && alpha > 0.01f)
+							alpha = 0.01f;
+						setAlpha = alpha;
+					}
+				} else {
+					if (mode == Settings::kIgnored) {
+						setAlpha = 100.0;
+					} else if (mode == Settings::kHidden) {
+						setVisible = false;
+						setAlpha = 0.0;
+					} else {
+						setAlpha = a_globalAlpha;
+				}
+			}
+
+			dInfo.SetVisible(setVisible);
+			dInfo.SetAlpha(setAlpha);
+
+			RE::GFxValue elem;
+			if (a_movie->GetVariable(&elem, path)) {
+				elem.SetDisplayInfo(dInfo);
+			}
 		}
 	}
 
-	float crosshairAlpha = (_ctxAlpha * 0.01f * 100.0f);
-	// SmoothCam logic: minimal opacity if active to prevent game hiding it.
-	if (CompatibilityCheck_SmoothCam() && crosshairAlpha > 0.01f) {
-		crosshairAlpha = 0.01f;
-	}
-
-	RE::GFxValue crosshairInstance;
-	if (a_movie->GetVariable(&crosshairInstance, "_root.HUDMovieBaseInstance.CrosshairInstance")) {
-		RE::GFxValue::DisplayInfo displayInfo;
-		crosshairInstance.GetDisplayInfo(std::addressof(displayInfo));
-		displayInfo.SetAlpha(crosshairAlpha);
-		crosshairInstance.SetDisplayInfo(displayInfo);
-	}
-
-	RE::GFxValue crosshairAlert;
-	if (a_movie->GetVariable(&crosshairAlert, "_root.HUDMovieBaseInstance.CrosshairAlert")) {
-		RE::GFxValue::DisplayInfo displayInfo;
-		crosshairAlert.GetDisplayInfo(std::addressof(displayInfo));
-		displayInfo.SetAlpha(crosshairAlpha);
-		crosshairAlert.SetDisplayInfo(displayInfo);
-	}
-
-	std::vector<std::string> paths;
 	const auto& pathSet = settings->GetSubWidgetPaths();
-	paths.reserve(pathSet.size());
-	paths.assign(pathSet.begin(), pathSet.end());
-
-	for (const auto& path : paths) {
-		if (!path.starts_with("_root.") || path == "_root.HUDMovieBaseInstance.StealthMeterInstance") {
+	for (const auto& path : pathSet) {
+		if (vanillaPaths.contains(path) || path == "_root.HUDMovieBaseInstance.StealthMeterInstance")
 			continue;
-		}
-		if (path.find("markerData") != std::string::npos || path.find("widgetLoaderContainer") != std::string::npos) {
+		if (path.find("markerData") != std::string::npos || path.find("widgetLoaderContainer") != std::string::npos)
 			continue;
-		}
 
 		int mode = settings->GetWidgetMode(path);
 		RE::GFxValue elem;
@@ -539,14 +543,16 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		RE::GFxValue::DisplayInfo dInfo;
 
 		if (mode == Settings::kIgnored) {
+			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
 			elem.SetDisplayInfo(dInfo);
 		} else if (mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
+			dInfo.SetAlpha(0.0);
 			elem.SetDisplayInfo(dInfo);
 		} else {
-			RE::GFxValue visVal;
-			if (elem.GetMember("_visible", &visVal) && visVal.GetBool()) {
+			RE::GFxValue::DisplayInfo currentInfo;
+			if (elem.GetDisplayInfo(&currentInfo) && currentInfo.GetVisible()) {
 				dInfo.SetAlpha(a_globalAlpha);
 				elem.SetDisplayInfo(dInfo);
 			}

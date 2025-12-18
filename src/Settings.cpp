@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "HUDElements.h"
 #include "Utils.h"
 
 struct WidgetGroupItem
@@ -12,14 +13,14 @@ void Settings::Load()
 	CSimpleIniA ini;
 	ini.SetUnicode();
 
+	// Load the base config (has all defaults)
+	const char* configPath = "Data/MCM/Config/ImmersiveHUD/settings.ini";
+	ini.LoadFile(configPath);
+
+	// Overlay user changes (only contains modified values)
 	const char* userPath = "Data/MCM/Settings/ImmersiveHUD.ini";
-	const char* defaultsPath = "Data/MCM/Config/ImmersiveHUD/settings.ini";
+	ini.LoadFile(userPath);
 
-	if (ini.LoadFile(userPath) < 0) {
-		ini.LoadFile(defaultsPath);
-	}
-
-	// 1. Load HUD Settings
 	const char* sectionHUD = "HUD";
 	_toggleKey = ini.GetLongValue(sectionHUD, "iToggleKey", 45);
 	_holdMode = ini.GetBoolValue(sectionHUD, "bHoldMode", false);
@@ -31,25 +32,26 @@ void Settings::Load()
 	_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
 	_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
 
-	// 2. Load all raw values from [Widgets] into temporary map
-	const char* sectionWidgets = "Widgets";
-	std::map<std::string, int> rawIniValues;
-	CSimpleIniA::TNamesDepend keys;
-	ini.GetAllKeys(sectionWidgets, keys);
+	_widgetPathToMode.clear();
+	std::unordered_set<std::string> vanillaPaths;
 
-	for (const auto& key : keys) {
-		std::string keyStr = key.pItem;
-		if (keyStr.starts_with("iMode_")) {
-			rawIniValues[keyStr] = ini.GetLongValue(sectionWidgets, keyStr.c_str(), 1);
+	// Map Vanilla HUD Elements
+	for (const auto& def : HUDElements::Get()) {
+		int mode = ini.GetLongValue("HUDElements", def.id, 1);
+		for (const auto& path : def.paths) {
+			_widgetPathToMode[path] = mode;
+			vanillaPaths.insert(path);
 		}
 	}
 
-	_widgetPathToMode.clear();
-
-	// 3. Map Raw Runtime Paths to Pretty INI Keys
+	// Map Dynamic Widgets
 	std::map<std::string, std::vector<WidgetGroupItem>> groupedWidgets;
 
 	for (const auto& path : _subWidgetPaths) {
+		if (vanillaPaths.contains(path)) {
+			continue;
+		}
+
 		// We must URL Decode the source to match MCMGen's behaviour.
 		// e.g. "B612%5FAnnouncement.swf" -> "B612_Announcement.swf"
 		std::string source = Utils::UrlDecode(GetWidgetSource(path));
@@ -76,10 +78,7 @@ void Settings::Load()
 			// Generate INI Key
 			std::string iniKey = "iMode_" + Utils::SanitizeName(finalDisplayName);
 
-			int mode = 1;  // Default kImmersive
-			if (auto it = rawIniValues.find(iniKey); it != rawIniValues.end()) {
-				mode = it->second;
-			}
+			int mode = ini.GetLongValue("Widgets", iniKey.c_str(), 1); // Default kImmersive
 
 			_widgetPathToMode[w.rawPath] = mode;
 		}

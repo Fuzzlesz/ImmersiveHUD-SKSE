@@ -110,6 +110,15 @@
       ]
     },
     {
+      "pageDisplayName": "$fzIH_PageElements",
+      "content": [
+        {
+          "type": "text",
+          "text": "$fzIH_ElementNewFound"
+        }
+      ]
+    },
+    {
       "pageDisplayName": "$fzIH_PageWidgets",
       "content": [
         {

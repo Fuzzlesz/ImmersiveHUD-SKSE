@@ -3,6 +3,7 @@ set(headers ${headers}
 	src/API/SmoothCamAPI.h
 	src/API/TrueDirectionalMovementAPI.h
 	src/Events.h
+	src/HUDElements.h
 	src/HUDManager.h
 	src/MCMGen.h
 	src/PCH.h
