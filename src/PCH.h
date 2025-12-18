@@ -13,6 +13,9 @@
 #include <ClibUtil/string.hpp>
 #include <spdlog/sinks/basic_file_sink.h>
 
+#include <numbers>
+#include <unordered_set>
+
 #define DLLEXPORT __declspec(dllexport)
 
 namespace logger = SKSE::log;

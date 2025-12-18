@@ -1,6 +1,5 @@
 #include "Utils.h"
 #include "Settings.h"
-#include <unordered_set>
 
 	namespace Utils
 {
