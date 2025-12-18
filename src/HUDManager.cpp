@@ -561,7 +561,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	for (const auto& path : kBaseElements) {
 		RE::GFxValue elem;
 		if (a_movie->GetVariable(&elem, path)) {
-			elem.SetMember("_alpha", a_globalAlpha);
+			RE::GFxValue::DisplayInfo dInfo;
+			dInfo.SetAlpha(a_globalAlpha);
+			elem.SetDisplayInfo(dInfo);
 		}
 	}
 
@@ -606,14 +608,19 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			continue;
 		}
 
+		RE::GFxValue::DisplayInfo dInfo;
+
 		if (mode == Settings::kIgnored) {
-			elem.SetMember("_alpha", 100.0);
+			dInfo.SetAlpha(100.0);
+			elem.SetDisplayInfo(dInfo);
 		} else if (mode == Settings::kHidden) {
-			elem.SetMember("_visible", false);
+			dInfo.SetVisible(false);
+			elem.SetDisplayInfo(dInfo);
 		} else {
 			RE::GFxValue visVal;
 			if (elem.GetMember("_visible", &visVal) && visVal.GetBool()) {
-				elem.SetMember("_alpha", a_globalAlpha);
+				dInfo.SetAlpha(a_globalAlpha);
+				elem.SetDisplayInfo(dInfo);
 			}
 		}
 	}
@@ -645,15 +652,19 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		int mode = settings->GetWidgetMode(menuNameStr);
+		RE::GFxValue root;
+		if (!entry.menu->uiMovie->GetVariable(&root, "_root")) {
+			continue;
+		}
+
+		RE::GFxValue::DisplayInfo dInfo;
 
 		if (mode == Settings::kIgnored) {
 			if (!entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(true);
 			}
-			RE::GFxValue root;
-			if (entry.menu->uiMovie->GetVariable(&root, "_root")) {
-				root.SetMember("_alpha", 100.0);
-			}
+			dInfo.SetAlpha(100.0);
+			root.SetDisplayInfo(dInfo);
 			continue;
 		}
 
@@ -664,22 +675,20 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 				entry.menu->uiMovie->SetVisible(true);
 			}
 
-			RE::GFxValue root;
-			if (entry.menu->uiMovie->GetVariable(&root, "_root")) {
-				// TrueHUD Specific Handling
-				if (menuNameStr == "TrueHUD") {
-					// If TDM lock-on is active, force TrueHUD visible (100% alpha) to show reticle/target.
-					// If not locked, it obeys global alpha (allowing health bars to hide/show via TrueHUD logic + iHUD fade).
-					if (tdmActive) {
-						root.SetMember("_alpha", 100.0);
-					} else {
-						root.SetMember("_alpha", a_alpha);
-					}
+			// TrueHUD Specific Handling
+			if (menuNameStr == "TrueHUD") {
+				// If TDM lock-on is active, force TrueHUD visible (100% alpha) to show reticle/target.
+				// If not locked, it obeys global alpha (allowing health bars to hide/show via TrueHUD logic + iHUD fade).
+				if (tdmActive) {
+					dInfo.SetAlpha(100.0);
 				} else {
-					// Standard External Widget
-					root.SetMember("_alpha", a_alpha);
+					dInfo.SetAlpha(a_alpha);
 				}
+			} else {
+				// Standard External Widget
+				dInfo.SetAlpha(a_alpha);
 			}
+			root.SetDisplayInfo(dInfo);
 		}
 	}
 }
