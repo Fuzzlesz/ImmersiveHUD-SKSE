@@ -32,8 +32,11 @@ public:
 	RE::TESGlobal* g_IFPV = nullptr;
 
 private:
+	bool ShouldHideHUD();
+
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
+	void EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName);
 
 	// a_deepScan = true: Recursively visit _root (slow, thorough).
 	// a_deepScan = false: Only check menuMap and WidgetContainer (fast).

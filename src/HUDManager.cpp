@@ -6,11 +6,11 @@
 #include "Utils.h"
 #include <numbers>
 
-	// ==========================================
-	// Hooks
-	// ==========================================
+// ==========================================
+// Hooks
+// ==========================================
 
-	struct PlayerUpdateHook
+struct PlayerUpdateHook
 {
 	static void thunk(RE::PlayerCharacter* a_this, float a_delta)
 	{
@@ -394,6 +394,37 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 // Menu & Widget Management
 // ==========================================
 
+bool HUDManager::ShouldHideHUD()
+{
+	auto ui = RE::UI::GetSingleton();
+	if (!ui) {
+		return false;
+	}
+
+	if (ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen()) {
+		return true;
+	}
+
+	for (const auto& [name, entry] : ui->menuMap) {
+		if (entry.menu && entry.menu->OnStack() && Utils::IsSystemMenu(name.c_str())) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void HUDManager::EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName)
+{
+	RE::GFxValue child;
+	if (a_parent.GetMember(a_childName, &child)) {
+		RE::GFxValue::DisplayInfo childInfo;
+		child.GetDisplayInfo(&childInfo);
+		childInfo.SetVisible(true);
+		childInfo.SetAlpha(100.0);
+		child.SetDisplayInfo(childInfo);
+	}
+}
+
 void HUDManager::ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes)
 {
 	for (int i = 0; i < 128; i++) {
@@ -555,93 +586,112 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	for (const auto& def : HUDElements::Get()) {
 		if (strcmp(def.id, "iMode_StealthMeter") == 0) {
-			for (const auto& path : def.paths) vanillaPaths.insert(path);
+			for (const auto& path : def.paths) {
+				vanillaPaths.insert(path);
+			}
 			continue;
 		}
+
+		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
+		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
+		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
+		bool isResourceBar = isHealth || isMagicka || isStamina;
+
+		bool isCrosshair = def.isCrosshair;
 
 		for (const auto& path : def.paths) {
 			vanillaPaths.insert(path);
 
 			int mode = settings->GetWidgetMode(path);
-			RE::GFxValue::DisplayInfo dInfo;
-			bool setVisible = true;
-			double setAlpha = 100.0;
+			RE::GFxValue elem;
 
-			if (a_hideAll) {
-				setVisible = false;
-				setAlpha = 0.0;
-			} else {
-				if (def.isCrosshair) {
-					if (mode == Settings::kHidden) {
-						setVisible = false;
-						setAlpha = 0.0;
-					} else if (mode == Settings::kIgnored) {
-						setAlpha = 100.0;
-					} else {
-						float alpha = (_ctxAlpha * 0.01f * 100.0f);
-						if (CompatibilityCheck_SmoothCam() && alpha > 0.01f)
-							alpha = 0.01f;
-						setAlpha = alpha;
+			if (!a_movie->GetVariable(&elem, path)) {
+				continue;
+			}
+
+			RE::GFxValue::DisplayInfo dInfo;
+			elem.GetDisplayInfo(&dInfo);
+
+			bool shouldBeVisible = true;
+			double targetAlpha = a_globalAlpha;
+
+			if (a_hideAll || mode == Settings::kHidden) {
+				shouldBeVisible = false;
+				targetAlpha = 0.0;
+			} else if (mode == Settings::kIgnored) {
+				shouldBeVisible = true;
+				targetAlpha = 100.0;
+			} else {  // Immersive
+				if (isCrosshair) {
+					float ctxBased = (_ctxAlpha * 0.01f * 100.0f);
+					if (CompatibilityCheck_SmoothCam() && ctxBased > 0.01f) {
+						ctxBased = 0.01f;
 					}
+					targetAlpha = ctxBased;
+					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
-					if (mode == Settings::kIgnored) {
-						setAlpha = 100.0;
-					} else if (mode == Settings::kHidden) {
-						setVisible = false;
-						setAlpha = 0.0;
-					} else {
-						setAlpha = a_globalAlpha;
-					}
+					shouldBeVisible = (a_globalAlpha > 0.0);
 				}
 			}
 
-			dInfo.SetVisible(setVisible);
-			dInfo.SetAlpha(setAlpha);
+			// Apply to Parent
+			dInfo.SetVisible(shouldBeVisible);
+			dInfo.SetAlpha(targetAlpha)
+			elem.SetDisplayInfo(dInfo);
 
-			RE::GFxValue elem;
-			if (a_movie->GetVariable(&elem, path)) {
-				elem.SetDisplayInfo(dInfo);
+			// Fix for Vanilla hiding meters when full
+			// Force child to be visible, parent's alpha controls the overall fade
+			if (isResourceBar && shouldBeVisible) {
+				const char* childName = nullptr;
+				if (isHealth)
+					childName = "HealthMeter_mc";
+				else if (isMagicka)
+					childName = "MagickaMeter_mc";
+				else if (isStamina)
+					childName = "StaminaMeter_mc";
+
+				if (childName) {
+					EnforceChildMeterVisible(elem, childName);
+				}
 			}
 		}
 	}
 
 	const auto& pathSet = settings->GetSubWidgetPaths();
 	for (const auto& path : pathSet) {
-		if (vanillaPaths.contains(path) || path == "_root.HUDMovieBaseInstance.StealthMeterInstance")
+		if (vanillaPaths.contains(path) ||
+			path == "_root.HUDMovieBaseInstance.StealthMeterInstance") {
 			continue;
-		if (path.find("markerData") != std::string::npos || path.find("widgetLoaderContainer") != std::string::npos)
+		}
+		if (path.find("markerData") != std::string::npos ||
+			path.find("widgetLoaderContainer") != std::string::npos) {
 			continue;
+		}
 
 		int mode = settings->GetWidgetMode(path);
 		RE::GFxValue elem;
+
 		if (!a_movie->GetVariable(&elem, path.c_str())) {
 			continue;
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
 
-		if (a_hideAll) {
+		if (a_hideAll || mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
 			dInfo.SetAlpha(0.0);
-			elem.SetDisplayInfo(dInfo);
-			continue;
-		}
-
-		if (mode == Settings::kIgnored) {
+		} else if (mode == Settings::kIgnored) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
-			elem.SetDisplayInfo(dInfo);
-		} else if (mode == Settings::kHidden) {
-			dInfo.SetVisible(false);
-			dInfo.SetAlpha(0.0);
-			elem.SetDisplayInfo(dInfo);
 		} else {
 			RE::GFxValue::DisplayInfo currentInfo;
-			if (elem.GetDisplayInfo(&currentInfo) && currentInfo.GetVisible()) {
+			elem.GetDisplayInfo(&currentInfo);
+			if (currentInfo.GetVisible()) {
 				dInfo.SetAlpha(a_globalAlpha);
-				elem.SetDisplayInfo(dInfo);
 			}
 		}
+
+		elem.SetDisplayInfo(dInfo);
 	}
 }
 
@@ -653,22 +703,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		return;
 	}
 
-	// Calculate if we should hide everything (including "Ignored" widgets).
-	// Check 1: Menu Flags
-	bool shouldHideAll = ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen();
-
-	// Check 2: Explicit System Menu List
-	// We iterate the menu map to check for any open system menus.
-	// We check OnStack() to ensure the menu is actually active.
-	if (!shouldHideAll) {
-		for (const auto& [name, entry] : ui->menuMap) {
-			if (entry.menu && entry.menu->OnStack() && Utils::IsSystemMenu(name.c_str())) {
-				shouldHideAll = true;
-				break;
-			}
-		}
-	}
-
+	bool shouldHideAll = ShouldHideHUD();
 	bool tdmActive = CompatibilityCheck_TDM();
 
 	for (auto& [name, entry] : ui->menuMap) {
