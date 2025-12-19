@@ -6,7 +6,7 @@
 #include "API/SmoothCamAPI.h"
 #include "API/TrueDirectionalMovementAPI.h"
 
-class HUDManager : public ISingleton<HUDManager>
+	class HUDManager : public ISingleton<HUDManager>
 {
 public:
 	void InstallHooks();
@@ -31,7 +31,7 @@ public:
 
 private:
 	void ApplyAlphaToHUD(float a_globalAlpha);
-	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha);
+	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
 
 	void ScanForWidgets(bool a_forceUpdate = false);
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);

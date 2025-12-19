@@ -6,11 +6,11 @@
 #include "Utils.h"
 #include <numbers>
 
-// ==========================================
-// Hooks
-// ==========================================
+	// ==========================================
+	// Hooks
+	// ==========================================
 
-struct PlayerUpdateHook
+	struct PlayerUpdateHook
 {
 	static void thunk(RE::PlayerCharacter* a_this, float a_delta)
 	{
@@ -475,7 +475,7 @@ void HUDManager::DumpHUDStructure()
 	}
 }
 
-void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha)
+void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll)
 {
 	const auto settings = Settings::GetSingleton();
 	static std::unordered_set<std::string> vanillaPaths;
@@ -494,6 +494,10 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			bool setVisible = true;
 			double setAlpha = 100.0;
 
+			if (a_hideAll) {
+				setVisible = false;
+				setAlpha = 0.0;
+			} else {
 				if (def.isCrosshair) {
 					if (mode == Settings::kHidden) {
 						setVisible = false;
@@ -514,6 +518,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 						setAlpha = 0.0;
 					} else {
 						setAlpha = a_globalAlpha;
+					}
 				}
 			}
 
@@ -542,6 +547,13 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 		RE::GFxValue::DisplayInfo dInfo;
 
+		if (a_hideAll) {
+			dInfo.SetVisible(false);
+			dInfo.SetAlpha(0.0);
+			elem.SetDisplayInfo(dInfo);
+			continue;
+		}
+
 		if (mode == Settings::kIgnored) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
@@ -568,6 +580,22 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		return;
 	}
 
+	// Calculate if we should hide everything (including "Ignored" widgets).
+	// Check 1: Menu Flags
+	bool shouldHideAll = ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen();
+
+	// Check 2: Explicit System Menu List
+	// We iterate the menu map to check for any open system menus.
+	// We check OnStack() to ensure the menu is actually active.
+	if (!shouldHideAll) {
+		for (const auto& [name, entry] : ui->menuMap) {
+			if (entry.menu && entry.menu->OnStack() && Utils::IsSystemMenu(name.c_str())) {
+				shouldHideAll = true;
+				break;
+			}
+		}
+	}
+
 	bool tdmActive = CompatibilityCheck_TDM();
 
 	for (auto& [name, entry] : ui->menuMap) {
@@ -577,7 +605,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		std::string menuNameStr(name.c_str());
 		if (menuNameStr == "HUD Menu") {
-			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha);
+			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha, shouldHideAll);
 			continue;
 		}
 
@@ -592,6 +620,17 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
+
+		// Force hide for external menus if system menus are open.
+		if (shouldHideAll) {
+			if (entry.menu->uiMovie->GetVisible()) {
+				entry.menu->uiMovie->SetVisible(false);
+			}
+			// Set Alpha to 0 just in case visibility toggle lags or is overridden
+			dInfo.SetAlpha(0.0);
+			root.SetDisplayInfo(dInfo);
+			continue;
+		}
 
 		if (mode == Settings::kIgnored) {
 			if (!entry.menu->uiMovie->GetVisible()) {
