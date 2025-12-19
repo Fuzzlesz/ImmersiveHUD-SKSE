@@ -81,13 +81,15 @@ void HUDManager::Reset()
 
 void HUDManager::ScanIfReady()
 {
-	if (_hasScanned) {
+	if (_hasScanned || _isScanPending) {
 		return;
 	}
 	auto* ui = RE::UI::GetSingleton();
 	if (ui && ui->GetMenu("HUD Menu")) {
+		_isScanPending = true;
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			ScanForWidgets(false, false);
+			_isScanPending = false;
 		});
 		_hasScanned = true;
 	}
@@ -95,8 +97,13 @@ void HUDManager::ScanIfReady()
 
 void HUDManager::RegisterNewMenu()
 {
+	if (_isScanPending) {
+		return;
+	}
+	_isScanPending = true;
 	SKSE::GetTaskInterface()->AddUITask([this]() {
 		ScanForWidgets(false, false);
+		_isScanPending = false;
 	});
 }
 

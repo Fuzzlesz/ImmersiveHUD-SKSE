@@ -63,6 +63,7 @@ private:
 	bool _userWantsVisible = false;
 	bool _installed = false;
 	bool _hasScanned = false;
+	std::atomic_bool _isScanPending = false;
 
 	float _currentAlpha = 0.0f;
 	float _targetAlpha = 0.0f;
