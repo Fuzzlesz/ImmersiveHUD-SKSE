@@ -63,7 +63,6 @@ void HUDManager::InitIFPV()
 
 void HUDManager::Reset()
 {
-	MCMGen::ResetSession();
 	Settings::GetSingleton()->Load();
 	_userWantsVisible = false;
 	_currentAlpha = 0.0f;

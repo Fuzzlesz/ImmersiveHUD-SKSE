@@ -9,11 +9,7 @@ namespace fs = std::filesystem;
 
 namespace MCMGen
 {
-	static std::set<std::string> _sessionStartIDs;
-	static bool _sessionInitialized = false;
 	static bool _iniModifiedThisSession = false;
-
-	void ResetSession() {}
 
 	bool WidgetSourceExists(const std::string& a_source)
 	{
@@ -118,34 +114,7 @@ namespace MCMGen
 		} catch (...) {}
 
 		try {
-			// 1. Session Initialization
-			if (!_sessionInitialized) {
-				if (fs::exists(configPath)) {
-					try {
-						std::ifstream inFile(configPath);
-						json j = json::parse(inFile);
-						if (j.contains("pages") && j["pages"].is_array()) {
-							for (const auto& page : j["pages"]) {
-								if ((page.value("pageDisplayName", "") == "$fzIH_PageWidgets" ||
-										page.value("pageDisplayName", "") == "$fzIH_PageElements") &&
-									page.contains("content")) {
-									for (const auto& item : page["content"]) {
-										if (item.contains("id")) {
-											std::string id = item["id"].get<std::string>();
-											if (id != "WidStatus" && id != "ElemStatus") {
-												_sessionStartIDs.insert(id);
-											}
-										}
-									}
-								}
-							}
-						}
-					} catch (...) {}
-				}
-				_sessionInitialized = true;
-			}
-
-			// 2. Load Configs
+			// 1. Load Configs
 			CSimpleIniA ini;
 			ini.SetUnicode();
 			bool iniLoaded = (ini.LoadFile(iniPath.string().c_str()) >= 0);
@@ -171,7 +140,7 @@ namespace MCMGen
 				config["pages"] = json::array();
 			}
 
-			// 3. Recover persisted paths from existing config
+			// 2. Recover persisted paths from existing config
 			std::map<std::string, std::string> allPaths;
 
 			for (const auto& page : config["pages"]) {
@@ -215,7 +184,7 @@ namespace MCMGen
 				allPaths[path] = src;
 			}
 
-			// 4. Generate Content for "HUD Elements" Page
+			// 3. Generate Content for "HUD Elements" Page
 			std::vector<ElementSortEntry> validElements;
 			std::unordered_set<std::string> processedPaths;
 			const auto& knownPaths = settings->GetSubWidgetPaths();
@@ -267,7 +236,7 @@ namespace MCMGen
 				elementsJsonList.push_back(entry.data);
 			}
 
-			// 5. Generate Content for "Widgets" Page (Dynamic)
+			// 4. Generate Content for "Widgets" Page (Dynamic)
 			std::map<std::string, std::vector<WidgetInfo>> groupedWidgets;
 			for (const auto& [path, source] : allPaths) {
 				if (processedPaths.contains(path)) {
@@ -309,18 +278,11 @@ namespace MCMGen
 				}
 			}
 
-			// 6. Calculate Status Flags
-			std::vector<std::string> addedIDs;
-			for (const auto& [id, _] : finalWidgetsMap) {
-				if (_sessionStartIDs.find(id) == _sessionStartIDs.end()) {
-					addedIDs.push_back(id);
-				}
-			}
-
+			// 5. Calculate Status Flags
 			bool elementsRelaunch = (!newIniKeysElements.empty());
-			bool widgetsRelaunch = (!newIniKeysWidgets.empty() || _iniModifiedThisSession || !addedIDs.empty());
+			bool widgetsRelaunch = (!newIniKeysWidgets.empty() || _iniModifiedThisSession);
 
-			// 7. Inject JSON Content
+			// 6. Inject JSON Content
 			json* widgetsContent = nullptr;
 			json* elementsContent = nullptr;
 
@@ -362,7 +324,7 @@ namespace MCMGen
 					widgetsContent->push_back(widgetJson);
 				}
 			}
-			// 8. Write to Disk
+			// 7. Write to Disk
 			if (config != originalConfig) {
 				std::ofstream outFile(configPath, std::ios::trunc);
 				if (outFile.is_open()) {
