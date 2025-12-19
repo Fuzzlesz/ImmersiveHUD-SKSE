@@ -20,6 +20,9 @@ namespace Utils
 	// Helper to safely extract the _url member from a MovieView
 	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie);
 
+	// Shared logic for scanning SkyUI Widget Containers.
+	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes);
+
 	// Dumps the structure of a GFxObject to the log.
 	class DebugVisitor : public RE::GFxValue::ObjectVisitor
 	{
@@ -40,8 +43,6 @@ namespace Utils
 		void Visit(const char* a_name, const RE::GFxValue& a_val) override;
 
 	private:
-		void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container);
-
 		int& _count;
 		bool& _changes;
 		std::string _pathPrefix;

@@ -429,47 +429,6 @@ void HUDManager::EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_
 	}
 }
 
-void HUDManager::ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes)
-{
-	for (int i = 0; i < 128; i++) {
-		RE::GFxValue entry;
-		std::string indexStr = std::to_string(i);
-
-		if (!const_cast<RE::GFxValue&>(a_container).GetMember(indexStr.c_str(), &entry)) {
-			continue;
-		}
-		if (!entry.IsObject()) {
-			continue;
-		}
-
-		RE::GFxValue widget;
-		if (!entry.GetMember("widget", &widget)) {
-			if (entry.IsDisplayObject()) {
-				widget = entry;
-			} else {
-				continue;
-			}
-		}
-		if (!widget.IsDisplayObject()) {
-			continue;
-		}
-
-		std::string widgetPath = a_path + "." + indexStr;
-		std::string url = "Internal/SkyUI Widget";
-
-		RE::GFxValue urlVal;
-		if (widget.GetMember("_url", &urlVal) && urlVal.IsString()) {
-			url = urlVal.GetString();
-		}
-
-		if (Settings::GetSingleton()->AddDiscoveredPath(widgetPath, url)) {
-			a_changes = true;
-			a_foundCount++;
-			logger::info("Discovered SkyUI Element: {} [Source: {}]", widgetPath, url);
-		}
-	}
-}
-
 void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes)
 {
 	if (!a_movie) {
@@ -540,7 +499,7 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
 			if (hudMovie->GetVariable(&root, "_root")) {
 				RE::GFxValue widgetContainer;
 				if (root.GetMember("WidgetContainer", &widgetContainer)) {
-					ScanArrayContainer("_root.WidgetContainer", widgetContainer, containerCount, changes);
+					Utils::ScanArrayContainer("_root.WidgetContainer", widgetContainer, containerCount, changes);
 				}
 			}
 		}

@@ -42,7 +42,6 @@ private:
 	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan);
 
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
-	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes);
 
 	void DumpHUDStructure();
 
