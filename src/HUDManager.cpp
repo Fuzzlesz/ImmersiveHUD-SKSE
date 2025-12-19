@@ -137,6 +137,46 @@ void HUDManager::OnButtonUp()
 // Compatibility & Logic Checks
 // ==========================================
 
+void HUDManager::ManageSmoothCamControl(bool a_shouldBlock)
+{
+	if (!g_SmoothCam)
+		return;
+
+	auto handle = SKSE::GetPluginHandle();
+
+	if (a_shouldBlock) {
+		if (!_hasSmoothCamCrosshairControl) {
+			auto res = g_SmoothCam->RequestCrosshairControl(handle);
+			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
+				_hasSmoothCamCrosshairControl = true;
+			}
+		}
+	} else {
+		if (_hasSmoothCamCrosshairControl) {
+			auto res = g_SmoothCam->ReleaseCrosshairControl(handle);
+			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::NotOwner) {
+				_hasSmoothCamCrosshairControl = false;
+			}
+		}
+	}
+
+	if (a_shouldBlock) {
+		if (!_hasSmoothCamStealthControl) {
+			auto res = g_SmoothCam->RequestStealthMeterControl(handle);
+			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
+				_hasSmoothCamStealthControl = true;
+			}
+		}
+	} else {
+		if (_hasSmoothCamStealthControl) {
+			auto res = g_SmoothCam->ReleaseStealthMeterControl(handle);
+			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::NotOwner) {
+				_hasSmoothCamStealthControl = false;
+			}
+		}
+	}
+}
+
 bool HUDManager::CompatibilityCheck_IFPV() const
 {
 	return g_IFPV && (g_IFPV->value != 0.0f);
@@ -286,6 +326,11 @@ void HUDManager::Update(float a_delta)
 		}
 	}
 
+	const bool shouldHide = ShouldHideHUD();
+
+	// Manage SmoothCam control to prevent crosshair leaking in menus
+	ManageSmoothCamControl(shouldHide);
+
 	const bool smoothCam = CompatibilityCheck_SmoothCam();
 	const bool tdm = CompatibilityCheck_TDM();
 	const bool btps = CompatibilityCheck_BTPS();
@@ -317,8 +362,10 @@ void HUDManager::Update(float a_delta)
 	if (settings->GetCrosshairSettings().enabled) {
 		float targetCtx = 0.0f;
 
-		if (tdm) {
-			targetCtx = 0.0f;  // Lock-on active, hide vanilla crosshair.
+		if (shouldHide) {
+			targetCtx = 0.0f;
+		} else if (tdm) {
+			targetCtx = 0.0f;
 		} else {
 			bool actionActive = ValidCastType(player->magicCasters[0]) ||
 			                    ValidCastType(player->magicCasters[1]) ||

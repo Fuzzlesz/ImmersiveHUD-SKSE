@@ -32,6 +32,7 @@ public:
 	RE::TESGlobal* g_IFPV = nullptr;
 
 private:
+	void ManageSmoothCamControl(bool a_shouldBlock);
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
 	void EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName);
@@ -60,6 +61,9 @@ private:
 	bool _installed = false;
 	bool _hasScanned = false;
 	std::atomic_bool _isScanPending = false;
+
+	bool _hasSmoothCamCrosshairControl = false;
+	bool _hasSmoothCamStealthControl = false;
 
 	float _currentAlpha = 0.0f;
 	float _targetAlpha = 0.0f;
