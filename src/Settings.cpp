@@ -52,9 +52,8 @@ void Settings::Load()
 			continue;
 		}
 
-		// We must URL Decode the source to match MCMGen's behaviour.
-		// e.g. "B612%5FAnnouncement.swf" -> "B612_Announcement.swf"
-		std::string source = Utils::UrlDecode(GetWidgetSource(path));
+		// Source is already pre-decoded in AddDiscoveredPath
+		std::string source = GetWidgetSource(path);
 		std::string pretty = Utils::GetWidgetDisplayName(path, source);
 		groupedWidgets[pretty].push_back({ path, pretty });
 	}
@@ -77,14 +76,9 @@ void Settings::Load()
 
 			// Generate INI Key
 			std::string iniKey = "iMode_" + Utils::SanitizeName(finalDisplayName);
-
-			int mode = ini.GetLongValue("Widgets", iniKey.c_str(), 1); // Default kImmersive
-
-			_widgetPathToMode[w.rawPath] = mode;
+			_widgetPathToMode[w.rawPath] = ini.GetLongValue("Widgets", iniKey.c_str(), 1);  // Default kImmersive
 		}
 	}
-
-	logger::info("Settings loaded. Mapped {} widget paths.", _widgetPathToMode.size());
 }
 
 void Settings::ResetCache()
@@ -96,11 +90,17 @@ void Settings::ResetCache()
 
 bool Settings::AddDiscoveredPath(const std::string& a_path, const std::string& a_source)
 {
-	bool isNew = _subWidgetPaths.insert(a_path).second;
-	if (!a_source.empty()) {
-		_widgetSources[a_path] = a_source;
+	// Check if already exists first to avoid string ops
+	if (_subWidgetPaths.contains(a_path)) {
+		return false;
 	}
-	return isNew;
+
+	_subWidgetPaths.insert(a_path);
+	if (!a_source.empty()) {
+		// Store decoded source once to prevent repetitive decoding elsewhere
+		_widgetSources[a_path] = Utils::UrlDecode(a_source);
+	}
+	return true;
 }
 
 std::string Settings::GetWidgetSource(const std::string& a_path) const

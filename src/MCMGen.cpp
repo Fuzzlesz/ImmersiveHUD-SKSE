@@ -4,7 +4,7 @@
 #include "Utils.h"
 #include <nlohmann/json.hpp>
 
-	using json = nlohmann::json;
+using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 namespace MCMGen
@@ -167,7 +167,6 @@ namespace MCMGen
 										sourceStr = help.substr(8, endPos - 8);
 									}
 								}
-								sourceStr = Utils::UrlDecode(sourceStr);
 								if (WidgetSourceExists(sourceStr)) {
 									allPaths[rawID] = sourceStr;
 								}
@@ -180,7 +179,7 @@ namespace MCMGen
 			const auto settings = Settings::GetSingleton();
 			auto memPaths = settings->GetSubWidgetPaths();
 			for (const auto& path : memPaths) {
-				std::string src = Utils::UrlDecode(settings->GetWidgetSource(path));
+				std::string src = settings->GetWidgetSource(path);
 				allPaths[path] = src;
 			}
 
