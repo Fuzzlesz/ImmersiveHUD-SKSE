@@ -1,3 +1,4 @@
+#include "Compat.h"
 #include "HUDManager.h"
 #include "MCMGen.h"
 #include "PCH.h"
@@ -5,12 +6,14 @@
 
 void OnInit(SKSE::MessagingInterface::Message* a_msg)
 {
+	auto compat = Compat::GetSingleton();
+
 	switch (a_msg->type) {
 	case SKSE::MessagingInterface::kPostLoad:
 		if (!SmoothCamAPI::RegisterInterfaceLoaderCallback(SKSE::GetMessagingInterface(),
 				[](void* interfaceInstance, SmoothCamAPI::InterfaceVersion interfaceVersion) {
 					if (interfaceVersion == SmoothCamAPI::InterfaceVersion::V3) {
-						HUDManager::GetSingleton()->g_SmoothCam = reinterpret_cast<SmoothCamAPI::IVSmoothCam3*>(interfaceInstance);
+						Compat::GetSingleton()->g_SmoothCam = reinterpret_cast<SmoothCamAPI::IVSmoothCam3*>(interfaceInstance);
 						logger::info("Obtained SmoothCam API");
 					} else {
 						logger::error("Unable to acquire requested SmoothCam API interface version");
@@ -19,18 +22,18 @@ void OnInit(SKSE::MessagingInterface::Message* a_msg)
 			logger::warn("SmoothCamAPI::RegisterInterfaceLoaderCallback reported an error");
 		}
 
-		HUDManager::GetSingleton()->g_TDM = reinterpret_cast<TDM_API::IVTDM2*>(TDM_API::RequestPluginAPI(TDM_API::InterfaceVersion::V2));
-		if (HUDManager::GetSingleton()->g_TDM) {
+		compat->g_TDM = reinterpret_cast<TDM_API::IVTDM2*>(TDM_API::RequestPluginAPI(TDM_API::InterfaceVersion::V2));
+		if (compat->g_TDM) {
 			logger::info("Obtained TDM API");
 		}
 
-		HUDManager::GetSingleton()->g_BTPS = reinterpret_cast<BTPS_API_decl::API_V0*>(BTPS_API_decl::RequestPluginAPI_V0());
-		if (HUDManager::GetSingleton()->g_BTPS) {
+		compat->g_BTPS = reinterpret_cast<BTPS_API_decl::API_V0*>(BTPS_API_decl::RequestPluginAPI_V0());
+		if (compat->g_BTPS) {
 			logger::info("Obtained BTPS API");
 		}
 
-		HUDManager::GetSingleton()->g_DetectionMeter = LoadLibraryA("Data/SKSE/Plugins/MaxsuDetectionMeter.dll");
-		if (HUDManager::GetSingleton()->g_DetectionMeter) {
+		compat->g_DetectionMeter = LoadLibraryA("Data/SKSE/Plugins/MaxsuDetectionMeter.dll");
+		if (compat->g_DetectionMeter) {
 			logger::info("Obtained Detection Meter DLL");
 		}
 		break;
@@ -43,9 +46,9 @@ void OnInit(SKSE::MessagingInterface::Message* a_msg)
 
 	case SKSE::MessagingInterface::kDataLoaded:
 		HUDManager::GetSingleton()->InstallHooks();
-		if (HUDManager::GetSingleton()->g_SmoothCam) {
-			HUDManager::GetSingleton()->InitIFPV();
-			if (HUDManager::GetSingleton()->g_IFPV) {
+		if (compat->g_SmoothCam) {
+			compat->InitIFPV();
+			if (compat->g_IFPV) {
 				logger::info("IFPV Detected - SmoothCam Compatibility Enabled");
 			}
 		}
@@ -123,6 +126,6 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_s
 	if (!messaging->RegisterListener(OnInit)) {
 		return false;
 	}
-	
+
 	return true;
 }

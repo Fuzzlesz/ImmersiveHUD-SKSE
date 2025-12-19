@@ -2,6 +2,7 @@ set(headers ${headers}
 	src/API/BTPS_API_decl.h
 	src/API/SmoothCamAPI.h
 	src/API/TrueDirectionalMovementAPI.h
+	src/Compat.h
 	src/Events.h
 	src/HUDElements.h
 	src/HUDManager.h

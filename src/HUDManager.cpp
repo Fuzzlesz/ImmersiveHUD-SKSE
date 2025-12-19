@@ -1,6 +1,7 @@
-#include "HUDManager.h"
+#include "Compat.h"
 #include "Events.h"
 #include "HUDElements.h"
+#include "HUDManager.h"
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -49,16 +50,6 @@ void HUDManager::InstallHooks()
 	_userWantsVisible = false;
 	_installed = true;
 	logger::info("HUDManager hooks installed.");
-}
-
-void HUDManager::InitIFPV()
-{
-	if (!g_IFPV) {
-		auto dataHandler = RE::TESDataHandler::GetSingleton();
-		if (dataHandler) {
-			g_IFPV = dataHandler->LookupForm<RE::TESGlobal>(0x801, "IFPVDetector.esl");
-		}
-	}
 }
 
 void HUDManager::Reset()
@@ -134,152 +125,6 @@ void HUDManager::OnButtonUp()
 }
 
 // ==========================================
-// Compatibility & Logic Checks
-// ==========================================
-
-void HUDManager::ManageSmoothCamControl(bool a_shouldBlock)
-{
-	if (!g_SmoothCam)
-		return;
-
-	auto handle = SKSE::GetPluginHandle();
-
-	if (a_shouldBlock) {
-		if (!_hasSmoothCamCrosshairControl) {
-			auto res = g_SmoothCam->RequestCrosshairControl(handle);
-			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
-				_hasSmoothCamCrosshairControl = true;
-			}
-		}
-	} else {
-		if (_hasSmoothCamCrosshairControl) {
-			auto res = g_SmoothCam->ReleaseCrosshairControl(handle);
-			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::NotOwner) {
-				_hasSmoothCamCrosshairControl = false;
-			}
-		}
-	}
-
-	if (a_shouldBlock) {
-		if (!_hasSmoothCamStealthControl) {
-			auto res = g_SmoothCam->RequestStealthMeterControl(handle);
-			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
-				_hasSmoothCamStealthControl = true;
-			}
-		}
-	} else {
-		if (_hasSmoothCamStealthControl) {
-			auto res = g_SmoothCam->ReleaseStealthMeterControl(handle);
-			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::NotOwner) {
-				_hasSmoothCamStealthControl = false;
-			}
-		}
-	}
-}
-
-bool HUDManager::CompatibilityCheck_IFPV() const
-{
-	return g_IFPV && (g_IFPV->value != 0.0f);
-}
-
-bool HUDManager::IsFakeFirstPerson() const
-{
-	auto camera = RE::PlayerCamera::GetSingleton();
-	if (!camera) {
-		return false;
-	}
-	if (camera->IsInFirstPerson() || camera->IsInFreeCameraMode()) {
-		return false;
-	}
-
-	auto thirdPersonState = static_cast<RE::ThirdPersonState*>(camera->currentState.get());
-	return thirdPersonState && thirdPersonState->currentZoomOffset == -0.275f;
-}
-
-bool HUDManager::CompatibilityCheck_TDM()
-{
-	return g_TDM && g_TDM->GetTargetLockState();
-}
-
-bool HUDManager::CompatibilityCheck_SmoothCam()
-{
-	if (CompatibilityCheck_IFPV()) {
-		return false;
-	}
-	if (IsFakeFirstPerson()) {
-		return false;
-	}
-
-	if (g_SmoothCam && g_SmoothCam->IsCameraEnabled()) {
-		if (auto playerCamera = RE::PlayerCamera::GetSingleton(); playerCamera) {
-			return playerCamera->currentState == playerCamera->cameraStates[RE::CameraState::kThirdPerson];
-		}
-	}
-	return false;
-}
-
-bool HUDManager::CompatibilityCheck_DetectionMeter()
-{
-	return g_DetectionMeter != nullptr;
-}
-
-bool HUDManager::CompatibilityCheck_BTPS()
-{
-	return g_BTPS && g_BTPS->GetWidget3DEnabled();
-}
-
-bool HUDManager::ValidPickType()
-{
-	if (auto crosshairPickData = RE::CrosshairPickData::GetSingleton()) {
-		if (auto refr = crosshairPickData->target.get()) {
-			return refr->GetFormType() != RE::FormType::ActorCharacter || refr.get()->As<RE::Actor>()->IsDead();
-		}
-	}
-	return false;
-}
-
-bool HUDManager::ValidCastType(RE::ActorMagicCaster* a_magicCaster)
-{
-	return a_magicCaster && ValidSpellType(a_magicCaster->currentSpell);
-}
-
-bool HUDManager::ValidAttackType(RE::PlayerCharacter* a_player)
-{
-	auto equipped = a_player->GetEquippedObject(true);
-	auto attackState = a_player->actorState1.meleeAttackState;
-
-	if (equipped && equipped->GetFormType() == RE::FormType::Weapon) {
-		auto weapon = equipped->As<RE::TESObjectWEAP>();
-		if (weapon->IsBow()) {
-			return attackState >= RE::ATTACK_STATE_ENUM::kBowAttached && attackState <= RE::ATTACK_STATE_ENUM::kBowNextAttack;
-		}
-		if (weapon->IsCrossbow()) {
-			return attackState >= RE::ATTACK_STATE_ENUM::kBowDraw && attackState <= RE::ATTACK_STATE_ENUM::kNextAttack;
-		}
-	}
-	return false;
-}
-
-bool HUDManager::ValidSpellType(RE::MagicItem* a_magicItem)
-{
-	if (!a_magicItem) {
-		return false;
-	}
-
-	auto isTelekinesis = false;
-	for (auto effect : a_magicItem->effects) {
-		if (effect->baseEffect && effect->baseEffect->HasArchetype(RE::EffectSetting::Archetype::kTelekinesis)) {
-			isTelekinesis = true;
-			break;
-		}
-	}
-
-	return ((a_magicItem->GetDelivery() == RE::MagicSystem::Delivery::kAimed) &&
-			   (a_magicItem->GetCastingType() != RE::MagicSystem::CastingType::kConcentration)) ||
-	       isTelekinesis;
-}
-
-// ==========================================
 // Update Loop
 // ==========================================
 
@@ -289,6 +134,7 @@ void HUDManager::Update(float a_delta)
 		return;
 	}
 	const auto player = RE::PlayerCharacter::GetSingleton();
+	const auto compat = Compat::GetSingleton();
 	if (!player) {
 		return;
 	}
@@ -329,11 +175,11 @@ void HUDManager::Update(float a_delta)
 	const bool shouldHide = ShouldHideHUD();
 
 	// Manage SmoothCam control to prevent crosshair leaking in menus
-	ManageSmoothCamControl(shouldHide);
+	compat->ManageSmoothCamControl(shouldHide);
 
-	const bool smoothCam = CompatibilityCheck_SmoothCam();
-	const bool tdm = CompatibilityCheck_TDM();
-	const bool btps = CompatibilityCheck_BTPS();
+	const bool smoothCam = compat->IsSmoothCamActive();
+	const bool tdm = compat->IsTDMActive();
+	const bool btps = compat->IsBTPSActive();
 
 	const auto settings = Settings::GetSingleton();
 	bool shouldBeVisible = _userWantsVisible;
@@ -362,18 +208,14 @@ void HUDManager::Update(float a_delta)
 	if (settings->GetCrosshairSettings().enabled) {
 		float targetCtx = 0.0f;
 
-		if (shouldHide) {
-			targetCtx = 0.0f;
-		} else if (tdm) {
+		if (shouldHide || tdm) {
 			targetCtx = 0.0f;
 		} else {
-			bool actionActive = ValidCastType(player->magicCasters[0]) ||
-			                    ValidCastType(player->magicCasters[1]) ||
-			                    ValidAttackType(player);
+			bool actionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
 
 			if (actionActive || smoothCam) {
 				targetCtx = 100.0f;
-			} else if (ValidPickType() && !btps) {
+			} else if (compat->IsCrosshairTargetValid() && !btps) {
 				targetCtx = 50.0f;
 			}
 		}
@@ -394,6 +236,7 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 
 	const auto settings = Settings::GetSingleton();
 	const auto player = RE::PlayerCharacter::GetSingleton();
+	const auto compat = Compat::GetSingleton();
 	if (!player) {
 		return;
 	}
@@ -412,9 +255,9 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 		return;
 	}
 
-	const bool smoothCam = CompatibilityCheck_SmoothCam();
-	const bool tdm = CompatibilityCheck_TDM();
-	const bool detectionMeter = CompatibilityCheck_DetectionMeter();
+	const bool smoothCam = compat->IsSmoothCamActive();
+	const bool tdm = compat->IsTDMActive();
+	const bool detectionMeter = compat->IsDetectionMeterInstalled();
 
 	float targetAlpha = 0.0f;
 
@@ -611,6 +454,7 @@ void HUDManager::DumpHUDStructure()
 void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll)
 {
 	const auto settings = Settings::GetSingleton();
+	const auto compat = Compat::GetSingleton();
 	static std::unordered_set<std::string> vanillaPaths;
 
 	for (const auto& def : HUDElements::Get()) {
@@ -652,7 +496,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else {  // Immersive
 				if (isCrosshair) {
 					float ctxBased = (_ctxAlpha * 0.01f * 100.0f);
-					if (CompatibilityCheck_SmoothCam() && ctxBased > 0.01f) {
+					if (compat->IsSmoothCamActive() && ctxBased > 0.01f) {
 						ctxBased = 0.01f;
 					}
 					targetAlpha = ctxBased;
@@ -715,12 +559,13 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 {
 	const auto ui = RE::UI::GetSingleton();
 	const auto settings = Settings::GetSingleton();
+	const auto compat = Compat::GetSingleton();
 	if (!ui) {
 		return;
 	}
 
 	bool shouldHideAll = ShouldHideHUD();
-	bool tdmActive = CompatibilityCheck_TDM();
+	bool tdmActive = compat->IsTDMActive();
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
