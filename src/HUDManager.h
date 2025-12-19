@@ -23,6 +23,7 @@ public:
 	void UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_sneakAnim);
 
 	void InitIFPV();
+	bool ShouldHideHUD();
 
 	SmoothCamAPI::IVSmoothCam3* g_SmoothCam = nullptr;
 	TDM_API::IVTDM2* g_TDM = nullptr;
@@ -31,8 +32,6 @@ public:
 	RE::TESGlobal* g_IFPV = nullptr;
 
 private:
-	bool ShouldHideHUD();
-
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
 	void EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName);

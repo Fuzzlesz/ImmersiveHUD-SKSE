@@ -73,7 +73,7 @@ void HUDManager::Reset()
 	_scanTimer = 0.0f;
 
 	if (_loadGracePeriod == 0.0f) {
-	_loadGracePeriod = 2.0f;
+		_loadGracePeriod = 2.0f;
 	}
 	logger::info("HUDManager reset.");
 }
@@ -346,7 +346,22 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 	_hasCachedSneakAnim = true;
 
 	const auto settings = Settings::GetSingleton();
-	if (!RE::PlayerCharacter::GetSingleton()) {
+	const auto player = RE::PlayerCharacter::GetSingleton();
+	if (!player) {
+		return;
+	}
+
+	const int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
+
+	// Force hidden if HUD should be hidden or mode is Hidden
+	if (ShouldHideHUD() || widgetMode == Settings::kHidden) {
+		RE::GFxValue::DisplayInfo d;
+		a_sneakAnim.GetDisplayInfo(&d);
+		if (d.GetVisible()) {
+			d.SetVisible(false);
+			d.SetAlpha(0.0f);
+			a_sneakAnim.SetDisplayInfo(d);
+		}
 		return;
 	}
 
@@ -354,10 +369,9 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 	const bool tdm = CompatibilityCheck_TDM();
 	const bool detectionMeter = CompatibilityCheck_DetectionMeter();
 
-	const int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
 	float targetAlpha = 0.0f;
 
-	if (RE::PlayerCharacter::GetSingleton()->IsSneaking()) {
+	if (player->IsSneaking()) {
 		if (widgetMode == Settings::kIgnored) {
 			targetAlpha = 100.0f;
 		} else if (widgetMode == Settings::kImmersive) {
@@ -378,20 +392,24 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 		}
 	}
 
-	_ctxSneakAlpha = std::lerp(_ctxSneakAlpha, targetAlpha, _prevDelta * settings->GetFadeSpeed());
+	float nextAlpha = std::lerp(_ctxSneakAlpha, targetAlpha, _prevDelta * settings->GetFadeSpeed());
 
-	if (widgetMode == Settings::kImmersive && settings->GetSneakMeterSettings().enabled && !_userWantsVisible && _ctxSneakAlpha > 0.01f) {
+	if (widgetMode == Settings::kImmersive && settings->GetSneakMeterSettings().enabled && !_userWantsVisible && nextAlpha > 0.01f) {
 		constexpr float kPulseRange = 0.05f;
 		constexpr float kPulseFreq = 0.05f;
 		auto detectionFreq = (a_detectionLevel / 200.0f) + 0.5f;
 		auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
-		_ctxSneakAlpha *= std::min(pulse, 1.0f);
+		nextAlpha *= std::min(pulse, 1.0f);
 	}
 
-	RE::GFxValue::DisplayInfo displayInfo;
-	a_sneakAnim.GetDisplayInfo(std::addressof(displayInfo));
-	displayInfo.SetAlpha(static_cast<float>(_ctxSneakAlpha));
-	a_sneakAnim.SetDisplayInfo(displayInfo);
+	if (std::abs(nextAlpha - _ctxSneakAlpha) > 0.01f) {
+		_ctxSneakAlpha = nextAlpha;
+		RE::GFxValue::DisplayInfo displayInfo;
+		a_sneakAnim.GetDisplayInfo(std::addressof(displayInfo));
+		displayInfo.SetAlpha(static_cast<float>(_ctxSneakAlpha));
+		displayInfo.SetVisible(_ctxSneakAlpha > 0.1f);
+		a_sneakAnim.SetDisplayInfo(displayInfo);
+	}
 }
 
 // ==========================================
@@ -405,6 +423,7 @@ bool HUDManager::ShouldHideHUD()
 		return false;
 	}
 
+	// Always hide if these core conditions are met
 	if (ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen()) {
 		return true;
 	}
@@ -596,22 +615,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				}
 			}
 
-			// Apply to Parent
 			dInfo.SetVisible(shouldBeVisible);
-			dInfo.SetAlpha(targetAlpha)
+			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
-			// Fix for Vanilla hiding meters when full
-			// Force child to be visible, parent's alpha controls the overall fade
 			if (isResourceBar && shouldBeVisible) {
-				const char* childName = nullptr;
-				if (isHealth)
-					childName = "HealthMeter_mc";
-				else if (isMagicka)
-					childName = "MagickaMeter_mc";
-				else if (isStamina)
-					childName = "StaminaMeter_mc";
-
+				const char* childName = isHealth ? "HealthMeter_mc" : (isMagicka ? "MagickaMeter_mc" : "StaminaMeter_mc");
 				if (childName) {
 					EnforceChildMeterVisible(elem, childName);
 				}
@@ -673,6 +682,16 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		std::string menuNameStr(name.c_str());
 		if (menuNameStr == "HUD Menu") {
+			// Explicitly set the visibility of the whole HUD movie to prevent elements leaking through
+			if (shouldHideAll) {
+				if (entry.menu->uiMovie->GetVisible()) {
+					entry.menu->uiMovie->SetVisible(false);
+				}
+			} else {
+				if (!entry.menu->uiMovie->GetVisible()) {
+					entry.menu->uiMovie->SetVisible(true);
+				}
+			}
 			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha, shouldHideAll);
 			continue;
 		}
@@ -709,18 +728,16 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		if (mode == Settings::kHidden) {
-			entry.menu->uiMovie->SetVisible(false);
+			if (entry.menu->uiMovie->GetVisible()) {
+				entry.menu->uiMovie->SetVisible(false);
+			}
 		} else {
 			if (!entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(true);
 			}
 
 			if (menuNameStr == "TrueHUD") {
-				if (tdmActive) {
-					dInfo.SetAlpha(100.0);
-				} else {
-					dInfo.SetAlpha(a_alpha);
-				}
+				dInfo.SetAlpha(tdmActive ? 100.0 : a_alpha);
 			} else {
 				dInfo.SetAlpha(a_alpha);
 			}
