@@ -315,7 +315,9 @@ void HUDManager::Update(float a_delta)
 		_ctxAlpha = _currentAlpha;
 	}
 
-	ApplyAlphaToHUD(_currentAlpha);
+	SKSE::GetTaskInterface()->AddUITask([this, alpha = _currentAlpha]() {
+		ApplyAlphaToHUD(alpha);
+	});
 }
 
 void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_sneakAnim)
