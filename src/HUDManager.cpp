@@ -173,27 +173,58 @@ void HUDManager::Update(float a_delta)
 	}
 
 	const bool shouldHide = ShouldHideHUD();
-
-	// Manage SmoothCam control to prevent crosshair leaking in menus
-	compat->ManageSmoothCamControl(shouldHide);
-
-	const bool smoothCam = compat->IsSmoothCamActive();
-	const bool tdm = compat->IsTDMActive();
-	const bool btps = compat->IsBTPSActive();
-
 	const auto settings = Settings::GetSingleton();
+
+	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
 
-	if (!_userWantsVisible) {
+	if (!shouldBeVisible) {
 		if ((settings->IsAlwaysShowInCombat() && player->IsInCombat()) ||
 			(settings->IsAlwaysShowWeaponDrawn() && player->IsWeaponDrawn())) {
 			shouldBeVisible = true;
 		}
 	}
-
 	_targetAlpha = shouldBeVisible ? 100.0f : 0.0f;
-	const float change = settings->GetFadeSpeed() * (a_delta * 60.0f);
 
+	// Crosshair Target Alpha
+	float targetCtx = 0.0f;
+	if (settings->GetCrosshairSettings().enabled) {
+		if (shouldHide || compat->IsTDMActive()) {
+			targetCtx = 0.0f;
+		} else {
+			bool actionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
+			if (actionActive || compat->IsSmoothCamActive()) {
+				targetCtx = 100.0f;
+			} else if (compat->IsCrosshairTargetValid() && !compat->IsBTPSActive()) {
+				targetCtx = 50.0f;
+			}
+		}
+	} else {
+		targetCtx = _targetAlpha;
+	}
+
+	// 2. Handle Hidden State & Transitions
+	if (shouldHide) {
+		_wasHidden = true;
+		compat->ManageSmoothCamControl(true);
+		SKSE::GetTaskInterface()->AddUITask([this]() { ApplyAlphaToHUD(0.0f); });
+		return;
+	}
+
+	// Snap to target instantly when coming out of a menu to match vanilla behaviour
+	if (_wasHidden) {
+		_currentAlpha = _targetAlpha;
+		_ctxAlpha = targetCtx;
+		_wasHidden = false;
+	}
+
+	compat->ManageSmoothCamControl(false);
+
+	// 3. Mixed Math Calculations
+	const float fadeSpeed = settings->GetFadeSpeed();
+	const float change = fadeSpeed * (a_delta * 60.0f);
+
+	// Global HUD: Linear Math (Vanilla Feel)
 	if (std::abs(_currentAlpha - _targetAlpha) <= change) {
 		_currentAlpha = _targetAlpha;
 	} else if (_currentAlpha < _targetAlpha) {
@@ -202,27 +233,14 @@ void HUDManager::Update(float a_delta)
 		_currentAlpha -= change;
 	}
 
+	// Crosshair: Lerp Math (Smooth Feel)
+	_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
+	if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
+		_ctxAlpha = targetCtx;
+	}
+
 	_prevDelta = a_delta;
 	_timer += _prevDelta;
-
-	if (settings->GetCrosshairSettings().enabled) {
-		float targetCtx = 0.0f;
-
-		if (shouldHide || tdm) {
-			targetCtx = 0.0f;
-		} else {
-			bool actionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
-
-			if (actionActive || smoothCam) {
-				targetCtx = 100.0f;
-			} else if (compat->IsCrosshairTargetValid() && !btps) {
-				targetCtx = 50.0f;
-			}
-		}
-		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, _prevDelta * settings->GetFadeSpeed());
-	} else {
-		_ctxAlpha = _currentAlpha;
-	}
 
 	SKSE::GetTaskInterface()->AddUITask([this, alpha = _currentAlpha]() {
 		ApplyAlphaToHUD(alpha);
@@ -282,22 +300,32 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 		}
 	}
 
-	float nextAlpha = std::lerp(_ctxSneakAlpha, targetAlpha, _prevDelta * settings->GetFadeSpeed());
+	// Snap transition if we just resumed from a menu
+	if (_wasHidden) {
+		_ctxSneakAlpha = targetAlpha;
+	}
 
-	if (widgetMode == Settings::kImmersive && settings->GetSneakMeterSettings().enabled && !_userWantsVisible && nextAlpha > 0.01f) {
+	// Stealth Meter: Lerp Math (Smooth Feel)
+	_ctxSneakAlpha = std::lerp(_ctxSneakAlpha, targetAlpha, _prevDelta * settings->GetFadeSpeed());
+	if (std::abs(_ctxSneakAlpha - targetAlpha) < 0.1f) {
+		_ctxSneakAlpha = targetAlpha;
+	}
+
+	// Pulse logic
+	float finalAlpha = _ctxSneakAlpha;
+	if (widgetMode == Settings::kImmersive && settings->GetSneakMeterSettings().enabled && !_userWantsVisible && finalAlpha > 0.01f) {
 		constexpr float kPulseRange = 0.05f;
 		constexpr float kPulseFreq = 0.05f;
 		auto detectionFreq = (a_detectionLevel / 200.0f) + 0.5f;
 		auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
-		nextAlpha *= std::min(pulse, 1.0f);
+		finalAlpha *= std::min(pulse, 1.0f);
 	}
 
-	if (std::abs(nextAlpha - _ctxSneakAlpha) > 0.01f) {
-		_ctxSneakAlpha = nextAlpha;
+	if (std::abs(finalAlpha - _ctxSneakAlpha) > 0.01f || _wasHidden) {
 		RE::GFxValue::DisplayInfo displayInfo;
 		a_sneakAnim.GetDisplayInfo(std::addressof(displayInfo));
-		displayInfo.SetAlpha(static_cast<float>(_ctxSneakAlpha));
-		displayInfo.SetVisible(_ctxSneakAlpha > 0.1f);
+		displayInfo.SetAlpha(static_cast<float>(finalAlpha));
+		displayInfo.SetVisible(finalAlpha > 0.1f);
 		a_sneakAnim.SetDisplayInfo(displayInfo);
 	}
 }
