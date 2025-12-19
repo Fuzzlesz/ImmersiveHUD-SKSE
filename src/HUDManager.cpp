@@ -559,7 +559,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
 		bool isResourceBar = isHealth || isMagicka || isStamina;
-
 		bool isCrosshair = def.isCrosshair;
 
 		for (const auto& path : def.paths) {
@@ -639,7 +638,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
-
 		if (a_hideAll || mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
 			dInfo.SetAlpha(0.0);
@@ -653,7 +651,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				dInfo.SetAlpha(a_globalAlpha);
 			}
 		}
-
 		elem.SetDisplayInfo(dInfo);
 	}
 }
