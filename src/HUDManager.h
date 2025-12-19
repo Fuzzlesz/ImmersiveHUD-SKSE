@@ -22,7 +22,6 @@ public:
 	void Update(float a_delta);
 	void UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_sneakAnim);
 
-	bool IsSystemMenu(const std::string& a_menuName);
 	void InitIFPV();
 
 	SmoothCamAPI::IVSmoothCam3* g_SmoothCam = nullptr;
@@ -45,7 +44,6 @@ private:
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
 	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes);
 
-	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie);
 	void DumpHUDStructure();
 
 	bool CompatibilityCheck_TDM();
