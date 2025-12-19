@@ -6,7 +6,7 @@
 #include "API/SmoothCamAPI.h"
 #include "API/TrueDirectionalMovementAPI.h"
 
-class HUDManager : public clib_util::singleton::ISingleton<HUDManager>
+class HUDManager : public ISingleton<HUDManager>
 {
 public:
 	void InstallHooks();
