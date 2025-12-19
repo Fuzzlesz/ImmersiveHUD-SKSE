@@ -71,8 +71,9 @@ void HUDManager::Reset()
 	_ctxAlpha = 0.0f;
 	_ctxSneakAlpha = 0.0f;
 	_timer = 0.0f;
+	_scanTimer = 0.0f;
 	_loadGracePeriod = 2.0f;
-	logger::info("HUDManager reset (Settings reloaded).");
+	logger::info("HUDManager reset.");
 }
 
 void HUDManager::ScanIfReady()
@@ -83,26 +84,26 @@ void HUDManager::ScanIfReady()
 	auto* ui = RE::UI::GetSingleton();
 	if (ui && ui->GetMenu("HUD Menu")) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
-			ScanForWidgets(false);
+			ScanForWidgets(false, false);
 		});
 		_hasScanned = true;
 	}
 }
 
+void HUDManager::RegisterNewMenu()
+{
+	SKSE::GetTaskInterface()->AddUITask([this]() {
+		ScanForWidgets(false, false);
+	});
+}
+
 void HUDManager::ForceScan()
 {
-	// Can still be called manually if needed, but not attached to Journal anymore.
-	ScanForWidgets(true);
+	ScanForWidgets(true, true);
 }
 
 void HUDManager::OnButtonDown()
 {
-	// Scan whenever the button is pressed.
-	// We pass 'false' for forceUpdate so it only logs if new widgets are found.
-	SKSE::GetTaskInterface()->AddUITask([this]() {
-		ScanForWidgets(false);
-	});
-
 	if (Settings::GetSingleton()->IsDumpHUDEnabled()) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			DumpHUDStructure();
@@ -243,17 +244,32 @@ void HUDManager::Update(float a_delta)
 		return;
 	}
 
-	// Grace Period: Count down, then trigger rescan.
-	// This ensures late widgets are caught after the delay.
+	// Grace period for initial load
 	if (_loadGracePeriod > 0.0f) {
 		_loadGracePeriod -= a_delta;
-
 		if (_loadGracePeriod <= 0.0f) {
 			_loadGracePeriod = 0.0f;
+
 			SKSE::GetTaskInterface()->AddUITask([this]() {
-				ScanForWidgets(false);
+				ScanForWidgets(false, true);  // Deep scan
 			});
-			logger::info("Grace period ended. Rescanning for late widgets.");
+			logger::info("Grace period ended. Rescanning.");
+
+			// Transition to Runtime state after scan
+			SKSE::GetTaskInterface()->AddUITask([this]() {
+				_loadGracePeriod = -1.0f;
+			});
+		}
+	}
+
+	// Periodic scan
+	_scanTimer += a_delta;
+	if (_scanTimer > 2.0f) {
+		_scanTimer = 0.0f;
+		if (_hasScanned) {
+			SKSE::GetTaskInterface()->AddUITask([this]() {
+				ScanForWidgets(false, false);
+			});
 		}
 	}
 
@@ -378,6 +394,47 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 // Menu & Widget Management
 // ==========================================
 
+void HUDManager::ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes)
+{
+	for (int i = 0; i < 128; i++) {
+		RE::GFxValue entry;
+		std::string indexStr = std::to_string(i);
+
+		if (!const_cast<RE::GFxValue&>(a_container).GetMember(indexStr.c_str(), &entry)) {
+			continue;
+		}
+		if (!entry.IsObject()) {
+			continue;
+		}
+
+		RE::GFxValue widget;
+		if (!entry.GetMember("widget", &widget)) {
+			if (entry.IsDisplayObject()) {
+				widget = entry;
+			} else {
+				continue;
+			}
+		}
+		if (!widget.IsDisplayObject()) {
+			continue;
+		}
+
+		std::string widgetPath = a_path + "." + indexStr;
+		std::string url = "Internal/SkyUI Widget";
+
+		RE::GFxValue urlVal;
+		if (widget.GetMember("_url", &urlVal) && urlVal.IsString()) {
+			url = urlVal.GetString();
+		}
+
+		if (Settings::GetSingleton()->AddDiscoveredPath(widgetPath, url)) {
+			a_changes = true;
+			a_foundCount++;
+			logger::info("Discovered SkyUI Element: {} [Source: {}]", widgetPath, url);
+		}
+	}
+}
+
 void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes)
 {
 	if (!a_movie) {
@@ -392,7 +449,7 @@ void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount,
 	root.VisitMembers(&visitor);
 }
 
-void HUDManager::ScanForWidgets(bool a_forceUpdate)
+void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
 {
 	auto* ui = RE::UI::GetSingleton();
 	if (!ui) {
@@ -420,6 +477,7 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate)
 		}
 	}
 
+	// Scan External Menus
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
 			continue;
@@ -438,16 +496,29 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate)
 		}
 	}
 
+	// Scan Widget Containers
 	if (hudMovie) {
-		ScanForContainers(hudMovie, containerCount, changes);
+		if (a_deepScan) {
+			ScanForContainers(hudMovie, containerCount, changes);
+		} else {
+			RE::GFxValue root;
+			if (hudMovie->GetVariable(&root, "_root")) {
+				RE::GFxValue widgetContainer;
+				if (root.GetMember("WidgetContainer", &widgetContainer)) {
+					ScanArrayContainer("_root.WidgetContainer", widgetContainer, containerCount, changes);
+				}
+			}
+		}
 	}
 
 	if (changes || a_forceUpdate) {
 		Settings::GetSingleton()->Load();
 
-		MCMGen::Update(_loadGracePeriod <= 0.0f);
+		// Use _loadGracePeriod to determine Init vs Runtime state for MCMGen status
+		MCMGen::Update(_loadGracePeriod < 0.0f);
+
 		if (changes) {
-			logger::info("Scan complete: Found {} external, {} internal.", externalCount, containerCount);
+			logger::info("Scan complete (Deep={}). Found {} external, {} internal.", a_deepScan, externalCount, containerCount);
 		}
 	}
 }
@@ -628,7 +699,6 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			if (entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(false);
 			}
-			// Set Alpha to 0 just in case visibility toggle lags or is overridden
 			dInfo.SetAlpha(0.0);
 			root.SetDisplayInfo(dInfo);
 			continue;
@@ -650,17 +720,13 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 				entry.menu->uiMovie->SetVisible(true);
 			}
 
-			// TrueHUD Specific Handling
 			if (menuNameStr == "TrueHUD") {
-				// If TDM lock-on is active, force TrueHUD visible (100% alpha) to show reticle/target.
-				// If not locked, it obeys global alpha (allowing health bars to hide/show via TrueHUD logic + iHUD fade).
 				if (tdmActive) {
 					dInfo.SetAlpha(100.0);
 				} else {
 					dInfo.SetAlpha(a_alpha);
 				}
 			} else {
-				// Standard External Widget
 				dInfo.SetAlpha(a_alpha);
 			}
 			root.SetDisplayInfo(dInfo);

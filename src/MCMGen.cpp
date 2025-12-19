@@ -1,10 +1,10 @@
-#include "HUDElements.h"
 #include "MCMGen.h"
+#include "HUDElements.h"
 #include "Settings.h"
 #include "Utils.h"
 #include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
+	using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 namespace MCMGen
@@ -335,6 +335,7 @@ namespace MCMGen
 
 			if (elementsContent) {
 				elementsContent->clear();
+				// Strict !a_isRuntime check to prevent persistent invalid status
 				if (elementsRelaunch && !a_isRuntime) {
 					elementsContent->push_back({ { "text", "$fzIH_ElementNewFound" }, { "type", "text" }, { "id", "ElemStatus" } });
 				} else {
@@ -349,6 +350,7 @@ namespace MCMGen
 
 			if (widgetsContent) {
 				widgetsContent->clear();
+				// Strict !a_isRuntime check
 				if (widgetsRelaunch && !a_isRuntime) {
 					widgetsContent->push_back({ { "text", "$fzIH_WidgetNewFound" }, { "type", "text" }, { "id", "WidStatus" } });
 				} else {

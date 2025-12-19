@@ -6,13 +6,15 @@
 #include "API/SmoothCamAPI.h"
 #include "API/TrueDirectionalMovementAPI.h"
 
-	class HUDManager : public ISingleton<HUDManager>
+class HUDManager : public ISingleton<HUDManager>
 {
 public:
 	void InstallHooks();
 	void Reset();
+
 	void ScanIfReady();
 	void ForceScan();
+	void RegisterNewMenu();
 
 	void OnButtonDown();
 	void OnButtonUp();
@@ -33,8 +35,12 @@ private:
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
 
-	void ScanForWidgets(bool a_forceUpdate = false);
+	// a_deepScan = true: Recursively visit _root (slow, thorough).
+	// a_deepScan = false: Only check menuMap and WidgetContainer (fast).
+	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan);
+
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
+	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes);
 
 	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie);
 	void DumpHUDStructure();
@@ -62,7 +68,8 @@ private:
 
 	float _prevDelta = 0.0f;
 	float _timer = 0.0f;
-	float _loadGracePeriod = 0.0f;  // Delay to allow widgets to settle on load and trigger a 2nd scan.
+	float _scanTimer = 0.0f;
+	float _loadGracePeriod = 0.0f;
 
 	RE::GFxValue _cachedSneakAnim;
 	bool _hasCachedSneakAnim = false;

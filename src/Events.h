@@ -3,8 +3,9 @@
 #include "HUDManager.h"
 #include "PCH.h"
 #include "Settings.h"
+#include "Utils.h"
 
-namespace Events
+	namespace Events
 {
 	class InputEventSink : public RE::BSTEventSink<RE::InputEvent*>
 	{
@@ -86,9 +87,15 @@ namespace Events
 				HUDManager::GetSingleton()->Reset();
 			}
 
-			// Force scan when HUD opens (game load finish)
-			if (a_event->menuName == RE::HUDMenu::MENU_NAME && a_event->opening) {
-				HUDManager::GetSingleton()->ScanIfReady();
+			if (a_event->opening) {
+				// 1. Force scan when HUD opens
+				if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
+					HUDManager::GetSingleton()->ScanIfReady();
+				}
+				// 2. Catch widgets appearing late
+				else if (!Utils::IsSystemMenu(a_event->menuName.c_str())) {
+					HUDManager::GetSingleton()->RegisterNewMenu();
+				}
 			}
 
 			return RE::BSEventNotifyControl::kContinue;
