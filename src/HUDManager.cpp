@@ -72,7 +72,10 @@ void HUDManager::Reset()
 	_ctxSneakAlpha = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
+
+	if (_loadGracePeriod == 0.0f) {
 	_loadGracePeriod = 2.0f;
+	}
 	logger::info("HUDManager reset.");
 }
 
@@ -248,17 +251,12 @@ void HUDManager::Update(float a_delta)
 	if (_loadGracePeriod > 0.0f) {
 		_loadGracePeriod -= a_delta;
 		if (_loadGracePeriod <= 0.0f) {
-			_loadGracePeriod = 0.0f;
+			_loadGracePeriod = -1.0f; // Transition to Runtime state after scan
 
 			SKSE::GetTaskInterface()->AddUITask([this]() {
 				ScanForWidgets(false, true);  // Deep scan
 			});
 			logger::info("Grace period ended. Rescanning.");
-
-			// Transition to Runtime state after scan
-			SKSE::GetTaskInterface()->AddUITask([this]() {
-				_loadGracePeriod = -1.0f;
-			});
 		}
 	}
 
