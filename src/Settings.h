@@ -7,7 +7,8 @@ public:
 	{
 		kVisible = 0,
 		kImmersive = 1,
-		kHidden = 2
+		kHidden = 2,
+		kIgnored = 3
 	};
 
 	struct CrosshairSettings

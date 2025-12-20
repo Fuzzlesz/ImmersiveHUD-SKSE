@@ -56,7 +56,7 @@ namespace MCMGen
 		return false;
 	}
 
-	json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
+json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
 	{
 		return {
 			{ "text", a_text },
@@ -65,7 +65,10 @@ namespace MCMGen
 			{ "id", a_id },
 			{ "valueOptions", { { "sourceType", "ModSettingInt" },
 								  { "defaultValue", 1 },
-								  { "options", json::array({ "$fzIH_ModeVisible", "$fzIH_ModeImmersive", "$fzIH_ModeHidden" }) } } }
+								  { "options", json::array({ "$fzIH_ModeVisible",
+												   "$fzIH_ModeImmersive",
+												   "$fzIH_ModeHidden",
+												   "$fzIH_ModeIgnored" }) } } }
 		};
 	}
 

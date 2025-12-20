@@ -551,6 +551,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			vanillaPaths.insert(path);
 
 			int mode = settings->GetWidgetMode(path);
+
+			// Skip element entirely if Ignored
+			if (mode == Settings::kIgnored) {
+				continue;
+			}
+
 			RE::GFxValue elem;
 
 			if (!a_movie->GetVariable(&elem, path)) {
@@ -630,6 +636,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		int mode = settings->GetWidgetMode(path);
+
+		// Skip dynamic widget if Ignored
+		if (mode == Settings::kIgnored) {
+			continue;
+		}
+
 		RE::GFxValue elem;
 
 		if (!a_movie->GetVariable(&elem, path.c_str())) {
@@ -643,7 +655,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
-		} else {
+		} else {  // Immersive
 			RE::GFxValue::DisplayInfo currentInfo;
 			elem.GetDisplayInfo(&currentInfo);
 			if (currentInfo.GetVisible()) {
@@ -692,6 +704,12 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		int mode = settings->GetWidgetMode(menuNameStr);
+
+		// Skip external menu if Ignored
+		if (mode == Settings::kIgnored) {
+			continue;
+		}
+
 		RE::GFxValue root;
 		if (!entry.menu->uiMovie->GetVariable(&root, "_root")) {
 			continue;
@@ -722,7 +740,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			if (entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(false);
 			}
-		} else {
+		} else {  // Immersive
 			if (!entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(true);
 			}
