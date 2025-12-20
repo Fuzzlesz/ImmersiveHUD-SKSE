@@ -9,7 +9,7 @@ class Compat : public ISingleton<Compat>
 {
 public:
 	// Initialization
-	void InitIFPV();
+	void InitExternalData();
 	void ManageSmoothCamControl(bool a_shouldBlock);
 
 	// Compatibility Checks
@@ -19,6 +19,10 @@ public:
 	bool IsBTPSActive();
 	bool IsIFPVActive();
 	bool IsFakeFirstPerson();
+
+	// External Control Logic
+	bool IsCompassAllowed();
+	bool IsSneakAllowed();
 
 	// Player State Logic
 	bool IsCrosshairTargetValid();
@@ -32,6 +36,10 @@ public:
 	BTPS_API_decl::API_V0* g_BTPS = nullptr;
 	HMODULE g_DetectionMeter = nullptr;
 	RE::TESGlobal* g_IFPV = nullptr;
+
+	// Generic HUD Control Globals (from ImmersiveHUD.esp)
+	RE::TESGlobal* g_DisableCompass = nullptr;  // 0xEEE
+	RE::TESGlobal* g_DisableSneak = nullptr;    // 0xFFF
 
 private:
 	bool _hasSmoothCamCrosshairControl = false;

@@ -4,13 +4,29 @@
 // Compatibility Implementation
 // ==========================================
 
-void Compat::InitIFPV()
+void Compat::InitExternalData()
 {
+	auto dataHandler = RE::TESDataHandler::GetSingleton();
+	if (!dataHandler) {
+		return;
+	}
+
+	// Immersive First Person View lookup
 	if (!g_IFPV) {
-		auto dataHandler = RE::TESDataHandler::GetSingleton();
-		if (dataHandler) {
-			g_IFPV = dataHandler->LookupForm<RE::TESGlobal>(0x801, "IFPVDetector.esl");
-		}
+		g_IFPV = dataHandler->LookupForm<RE::TESGlobal>(0x801, "IFPVDetector.esl");
+	}
+
+	// Internal Global Control lookup (ImmersiveHUD.esp)
+	// These allow external mods to force-hide elements via script/patch
+	if (!g_DisableCompass) {
+		g_DisableCompass = dataHandler->LookupForm<RE::TESGlobal>(0xEEE, "ImmersiveHUD.esp");
+	}
+	if (!g_DisableSneak) {
+		g_DisableSneak = dataHandler->LookupForm<RE::TESGlobal>(0xFFF, "ImmersiveHUD.esp");
+	}
+
+	if (g_DisableCompass || g_DisableSneak) {
+		logger::info("Linked generic HUD control globals from ImmersiveHUD.esp");
 	}
 }
 
@@ -94,6 +110,18 @@ bool Compat::IsFakeFirstPerson()
 
 	auto thirdPersonState = static_cast<RE::ThirdPersonState*>(camera->currentState.get());
 	return thirdPersonState && thirdPersonState->currentZoomOffset == -0.275f;
+}
+
+bool Compat::IsCompassAllowed()
+{
+	// Element is allowed if the "Disable" global is 0 (or if the global isn't found)
+	return !g_DisableCompass || (g_DisableCompass->value == 0.0f);
+}
+
+bool Compat::IsSneakAllowed()
+{
+	// Element is allowed if the "Disable" global is 0 (or if the global isn't found)
+	return !g_DisableSneak || (g_DisableSneak->value == 0.0f);
 }
 
 bool Compat::IsCrosshairTargetValid()

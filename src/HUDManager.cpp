@@ -261,8 +261,8 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 
 	const int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
 
-	// Force hidden if HUD should be hidden or mode is Hidden
-	if (ShouldHideHUD() || widgetMode == Settings::kHidden) {
+	// Force hidden if HUD should be hidden, mode is Hidden, or global in esp is set
+	if (ShouldHideHUD() || widgetMode == Settings::kHidden || !compat->IsSneakAllowed()) {
 		RE::GFxValue::DisplayInfo d;
 		a_sneakAnim.GetDisplayInfo(&d);
 		if (d.GetVisible()) {
@@ -516,6 +516,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			double targetAlpha = a_globalAlpha;
 
 			if (a_hideAll || mode == Settings::kHidden) {
+				shouldBeVisible = false;
+				targetAlpha = 0.0;
+			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
 			} else if (mode == Settings::kIgnored) {

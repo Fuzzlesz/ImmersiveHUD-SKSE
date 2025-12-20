@@ -46,12 +46,7 @@ void OnInit(SKSE::MessagingInterface::Message* a_msg)
 
 	case SKSE::MessagingInterface::kDataLoaded:
 		HUDManager::GetSingleton()->InstallHooks();
-		if (compat->g_SmoothCam) {
-			compat->InitIFPV();
-			if (compat->g_IFPV) {
-				logger::info("IFPV Detected - SmoothCam Compatibility Enabled");
-			}
-		}
+		compat->InitExternalData();
 		break;
 
 	case SKSE::MessagingInterface::kPostLoadGame:
