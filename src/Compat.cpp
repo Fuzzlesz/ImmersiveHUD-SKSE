@@ -161,8 +161,22 @@ bool Compat::IsPlayerCasting(RE::PlayerCharacter* a_player)
 	if (!a_player) {
 		return false;
 	}
-	return IsSpellContextual(a_player->magicCasters[0]->currentSpell) ||
-	       IsSpellContextual(a_player->magicCasters[1]->currentSpell);
+
+	bool leftCasting = false;
+	if (auto* leftCaster = a_player->magicCasters[0]) {
+		if (leftCaster->currentSpell) {
+			leftCasting = IsSpellContextual(leftCaster->currentSpell);
+		}
+	}
+
+	bool rightCasting = false;
+	if (auto* rightCaster = a_player->magicCasters[1]) {
+		if (rightCaster->currentSpell) {
+			rightCasting = IsSpellContextual(rightCaster->currentSpell);
+		}
+	}
+
+	return leftCasting || rightCasting;
 }
 
 bool Compat::IsPlayerAttacking(RE::PlayerCharacter* a_player)
