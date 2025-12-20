@@ -65,7 +65,7 @@ namespace MCMGen
 			{ "id", a_id },
 			{ "valueOptions", { { "sourceType", "ModSettingInt" },
 								  { "defaultValue", 1 },
-								  { "options", json::array({ "$fzIH_ModeIgnored", "$fzIH_ModeImmersive", "$fzIH_ModeHidden" }) } } }
+								  { "options", json::array({ "$fzIH_ModeVisible", "$fzIH_ModeImmersive", "$fzIH_ModeHidden" }) } } }
 		};
 	}
 

@@ -21,7 +21,10 @@ public:
 private:
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
-	void EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName);
+
+	// Child Visibility Enforcement
+	void EnforceHMSMeterVisible(RE::GFxValue& a_parent);
+	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
 
 	// a_deepScan = true: Recursively visit _root (slow, thorough).
 	// a_deepScan = false: Only check menuMap and WidgetContainer (fast).
@@ -41,6 +44,8 @@ private:
 	float _targetAlpha = 0.0f;
 	float _ctxAlpha = 0.0f;
 	float _ctxSneakAlpha = 0.0f;
+	float _enchantAlphaL = 0.0f;
+	float _enchantAlphaR = 0.0f;
 
 	float _prevDelta = 0.0f;
 	float _timer = 0.0f;

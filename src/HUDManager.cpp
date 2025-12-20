@@ -8,6 +8,31 @@
 #include <numbers>
 
 // ==========================================
+// Internal Helpers
+// ==========================================
+
+namespace
+{
+	// Aggressively forces any DisplayObject found to be visible and at 100 alpha.
+	// Used to fix vanilla enchantment charge meter visibility issues, required for unlabeled children.
+	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
+	{
+	public:
+		void Visit(const char* /*a_name*/, const RE::GFxValue& a_val) override
+		{
+			if (a_val.IsDisplayObject()) {
+				RE::GFxValue::DisplayInfo d;
+				const_cast<RE::GFxValue&>(a_val).GetDisplayInfo(&d);
+				d.SetVisible(true);
+				d.SetAlpha(100.0);
+				const_cast<RE::GFxValue&>(a_val).SetDisplayInfo(d);
+				const_cast<RE::GFxValue&>(a_val).VisitMembers(this);
+			}
+		}
+	};
+}
+
+// ==========================================
 // Hooks
 // ==========================================
 
@@ -60,6 +85,8 @@ void HUDManager::Reset()
 	_targetAlpha = 0.0f;
 	_ctxAlpha = 0.0f;
 	_ctxSneakAlpha = 0.0f;
+	_enchantAlphaL = 0.0f;
+	_enchantAlphaR = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
 
@@ -215,6 +242,8 @@ void HUDManager::Update(float a_delta)
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
 		_ctxAlpha = targetCtx;
+		_enchantAlphaL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
+		_enchantAlphaR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
 		_wasHidden = false;
 	}
 
@@ -238,6 +267,22 @@ void HUDManager::Update(float a_delta)
 	if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
 		_ctxAlpha = targetCtx;
 	}
+
+	// Enchantment: Linear Math
+	float targetEnL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
+	float targetEnR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
+
+	auto UpdateLinear = [&](float& a_current, float a_target) {
+		if (std::abs(a_current - a_target) <= change) {
+			a_current = a_target;
+		} else if (a_current < a_target) {
+			a_current += change;
+		} else {
+			a_current -= change;
+		}
+	};
+	UpdateLinear(_enchantAlphaL, targetEnL);
+	UpdateLinear(_enchantAlphaR, targetEnR);
 
 	_prevDelta = a_delta;
 	_timer += _prevDelta;
@@ -280,7 +325,7 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 	float targetAlpha = 0.0f;
 
 	if (player->IsSneaking()) {
-		if (widgetMode == Settings::kIgnored) {
+		if (widgetMode == Settings::kVisible) {
 			targetAlpha = 100.0f;
 		} else if (widgetMode == Settings::kImmersive) {
 			if (settings->GetSneakMeterSettings().enabled) {
@@ -354,16 +399,16 @@ bool HUDManager::ShouldHideHUD()
 	return false;
 }
 
-void HUDManager::EnforceChildMeterVisible(RE::GFxValue& a_parent, const char* a_childName)
+void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent)
 {
-	RE::GFxValue child;
-	if (a_parent.GetMember(a_childName, &child)) {
-		RE::GFxValue::DisplayInfo childInfo;
-		child.GetDisplayInfo(&childInfo);
-		childInfo.SetVisible(true);
-		childInfo.SetAlpha(100.0);
-		child.SetDisplayInfo(childInfo);
-	}
+	VisibilityHammer hammer;
+	a_parent.VisitMembers(&hammer);
+}
+
+void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
+{
+	VisibilityHammer hammer;
+	a_parent.VisitMembers(&hammer);
 }
 
 void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes)
@@ -496,6 +541,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
+		bool isEnchantLeft = (strcmp(def.id, "iMode_EnchantLeft") == 0);
+		bool isEnchantRight = (strcmp(def.id, "iMode_EnchantRight") == 0);
+		bool isEnchantSkyHUD = (strcmp(def.id, "iMode_EnchantCombined") == 0);
 		bool isResourceBar = isHealth || isMagicka || isStamina;
 		bool isCrosshair = def.isCrosshair;
 
@@ -521,7 +569,24 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
-			} else if (mode == Settings::kIgnored) {
+			}
+			// Enchantment Logic: Context-aware Linear Transitions
+			else if (isEnchantLeft || isEnchantRight || isEnchantSkyHUD) {
+				float trackedAlpha = 0.0f;
+				if (isEnchantLeft)
+					trackedAlpha = _enchantAlphaL;
+				else if (isEnchantRight)
+					trackedAlpha = _enchantAlphaR;
+				else if (isEnchantSkyHUD)
+					trackedAlpha = std::max(_enchantAlphaL, _enchantAlphaR);
+
+				if (mode == Settings::kVisible) {
+					targetAlpha = trackedAlpha;
+				} else {  // Immersive
+					targetAlpha = std::min(trackedAlpha, static_cast<float>(a_globalAlpha));
+				}
+				shouldBeVisible = (targetAlpha > 0.01);
+			} else if (mode == Settings::kVisible) {
 				shouldBeVisible = true;
 				targetAlpha = 100.0;
 			} else {  // Immersive
@@ -534,6 +599,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
 					shouldBeVisible = (a_globalAlpha > 0.0);
+					targetAlpha = a_globalAlpha;
 				}
 			}
 
@@ -541,10 +607,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
-			if (isResourceBar && shouldBeVisible) {
-				const char* childName = isHealth ? "HealthMeter_mc" : (isMagicka ? "MagickaMeter_mc" : "StaminaMeter_mc");
-				if (childName) {
-					EnforceChildMeterVisible(elem, childName);
+			// Hammer fixes for nested children
+			if (shouldBeVisible && targetAlpha > 0.1) {
+				if (isResourceBar) {
+					EnforceHMSMeterVisible(elem);
+				} else if (isEnchantLeft || isEnchantRight || isEnchantSkyHUD) {
+					EnforceEnchantMeterVisible(elem);
 				}
 			}
 		}
@@ -572,7 +640,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		if (a_hideAll || mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
 			dInfo.SetAlpha(0.0);
-		} else if (mode == Settings::kIgnored) {
+		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
 		} else {
@@ -641,7 +709,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			continue;
 		}
 
-		if (mode == Settings::kIgnored) {
+		if (mode == Settings::kVisible) {
 			if (!entry.menu->uiMovie->GetVisible()) {
 				entry.menu->uiMovie->SetVisible(true);
 			}

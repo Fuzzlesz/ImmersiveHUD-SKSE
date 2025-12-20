@@ -5,7 +5,7 @@ class Settings : public ISingleton<Settings>
 public:
 	enum WidgetMode
 	{
-		kIgnored = 0,
+		kVisible = 0,
 		kImmersive = 1,
 		kHidden = 2
 	};

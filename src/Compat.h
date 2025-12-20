@@ -24,6 +24,10 @@ public:
 	bool IsCompassAllowed();
 	bool IsSneakAllowed();
 
+	// State Context Helpers
+	bool HasEnchantedWeapon(bool a_leftHand);
+	bool IsPlayerWeaponDrawn();
+
 	// Player State Logic
 	bool IsCrosshairTargetValid();
 	bool IsPlayerCasting(RE::PlayerCharacter* a_player);

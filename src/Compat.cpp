@@ -124,6 +124,28 @@ bool Compat::IsSneakAllowed()
 	return !g_DisableSneak || (g_DisableSneak->value == 0.0f);
 }
 
+bool Compat::HasEnchantedWeapon(bool a_leftHand)
+{
+	auto player = RE::PlayerCharacter::GetSingleton();
+	if (!player) {
+		return false;
+	}
+
+	auto obj = player->GetEquippedObject(a_leftHand);
+	if (!obj || obj->GetFormType() != RE::FormType::Weapon) {
+		return false;
+	}
+
+	auto entryData = player->GetEquippedEntryData(a_leftHand);
+	return entryData && entryData->IsEnchanted();
+}
+
+bool Compat::IsPlayerWeaponDrawn()
+{
+	auto player = RE::PlayerCharacter::GetSingleton();
+	return player && player->IsWeaponDrawn();
+}
+
 bool Compat::IsCrosshairTargetValid()
 {
 	if (auto crosshairPickData = RE::CrosshairPickData::GetSingleton()) {
