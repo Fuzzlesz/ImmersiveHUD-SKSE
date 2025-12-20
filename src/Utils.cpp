@@ -101,7 +101,8 @@ namespace Utils
 			"Loading Menu", "Fader Menu", "Main Menu", "Mist Menu", "LoadWaitSpinner",
 			"Dialogue Menu", "MessageBoxMenu", "Cursor Menu", "Top Menu", "SafeZoneMenu",
 			"Credits Menu", "Tutorial Menu", "RaceSex Menu", "Kinect Menu",
-			"Console Native UI Menu", "CustomMenu", "CPECustomMenu", "PluginExplorerMenu"
+			"Console Native UI Menu", "CustomMenu", "CPECustomMenu", "PluginExplorerMenu",
+			"Training Menu", "MessageBoxMenu"
 		};
 		return systemMenus.contains(a_menuName);
 	}
