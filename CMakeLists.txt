@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 set(NAME "ImmersiveHUD" CACHE STRING "")
-set(VERSION 2.1.0 CACHE STRING "")
+set(VERSION 2.1.2 CACHE STRING "")
 set(AE_VERSION 1)
 
 # ---- Options ----
