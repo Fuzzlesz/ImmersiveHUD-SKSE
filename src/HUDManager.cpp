@@ -18,9 +18,24 @@ namespace
 	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
 	{
 	public:
-		void Visit(const char* /*a_name*/, const RE::GFxValue& a_val) override
+		VisibilityHammer(bool a_skipFills = false) :
+			_skipFills(a_skipFills) {}
+
+		void Visit(const char* a_name, const RE::GFxValue& a_val) override
 		{
 			if (a_val.IsDisplayObject()) {
+				std::string name = a_name ? a_name : "";
+				std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+				if (_skipFills) {
+					// Skip internal bar 'fills' for HMS and Enemy Health to allow draining animations.
+					if (name == "metermovieclip" || name == "penaltymetermovieclip" ||
+						name == "blinkmovieclip" || name.find("meter_mc") != std::string::npos ||
+						name.find("penaltymeter_mc") != std::string::npos) {
+						return;
+					}
+				}
+
 				RE::GFxValue::DisplayInfo d;
 				const_cast<RE::GFxValue&>(a_val).GetDisplayInfo(&d);
 				d.SetVisible(true);
@@ -29,6 +44,9 @@ namespace
 				const_cast<RE::GFxValue&>(a_val).VisitMembers(this);
 			}
 		}
+
+	private:
+		bool _skipFills;
 	};
 }
 
@@ -401,14 +419,18 @@ bool HUDManager::ShouldHideHUD()
 
 void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent)
 {
-	VisibilityHammer hammer;
-	a_parent.VisitMembers(&hammer);
+	if (a_parent.IsObject()) {
+		VisibilityHammer hammer(true);  // Protect HMS anims
+		a_parent.VisitMembers(&hammer);
+	}
 }
 
 void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
 {
-	VisibilityHammer hammer;
-	a_parent.VisitMembers(&hammer);
+	if (a_parent.IsObject()) {
+		VisibilityHammer hammer(false);  // Fix unlabelled enchant meter frames
+		a_parent.VisitMembers(&hammer);
+	}
 }
 
 void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes)
@@ -528,12 +550,14 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 {
 	const auto settings = Settings::GetSingleton();
 	const auto compat = Compat::GetSingleton();
-	static std::unordered_set<std::string> vanillaPaths;
+
+	// Local set to track paths processed in this frame and prevent growth leaks
+	std::unordered_set<std::string> processedPaths;
 
 	for (const auto& def : HUDElements::Get()) {
 		if (strcmp(def.id, "iMode_StealthMeter") == 0) {
 			for (const auto& path : def.paths) {
-				vanillaPaths.insert(path);
+				processedPaths.insert(path);
 			}
 			continue;
 		}
@@ -544,22 +568,21 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isEnchantLeft = (strcmp(def.id, "iMode_EnchantLeft") == 0);
 		bool isEnchantRight = (strcmp(def.id, "iMode_EnchantRight") == 0);
 		bool isEnchantSkyHUD = (strcmp(def.id, "iMode_EnchantCombined") == 0);
-		bool isResourceBar = isHealth || isMagicka || isStamina;
+		bool isEnemyHealth = (strcmp(def.id, "iMode_EnemyHealth") == 0);
+		bool isResourceBar = isHealth || isMagicka || isStamina || isEnemyHealth;
 		bool isCrosshair = def.isCrosshair;
 
 		for (const auto& path : def.paths) {
-			vanillaPaths.insert(path);
+			processedPaths.insert(path);
 
 			int mode = settings->GetWidgetMode(path);
-
-			// Skip element entirely if Ignored
-			if (mode == Settings::kIgnored) {
-				continue;
-			}
-
 			RE::GFxValue elem;
 
 			if (!a_movie->GetVariable(&elem, path)) {
+				continue;
+			}
+
+			if (!elem.IsDisplayObject()) {
 				continue;
 			}
 
@@ -626,25 +649,20 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	const auto& pathSet = settings->GetSubWidgetPaths();
 	for (const auto& path : pathSet) {
-		if (vanillaPaths.contains(path) ||
+		if (processedPaths.contains(path) ||
 			path == "_root.HUDMovieBaseInstance.StealthMeterInstance") {
 			continue;
 		}
+
 		if (path.find("markerData") != std::string::npos ||
 			path.find("widgetLoaderContainer") != std::string::npos) {
 			continue;
 		}
 
 		int mode = settings->GetWidgetMode(path);
-
-		// Skip dynamic widget if Ignored
-		if (mode == Settings::kIgnored) {
-			continue;
-		}
-
 		RE::GFxValue elem;
 
-		if (!a_movie->GetVariable(&elem, path.c_str())) {
+		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
 			continue;
 		}
 
@@ -655,12 +673,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
-		} else {  // Immersive
-			RE::GFxValue::DisplayInfo currentInfo;
-			elem.GetDisplayInfo(&currentInfo);
-			if (currentInfo.GetVisible()) {
-				dInfo.SetAlpha(a_globalAlpha);
-			}
+		} else {
+			dInfo.SetVisible(a_globalAlpha > 0.1f);
+			dInfo.SetAlpha(a_globalAlpha);
 		}
 		elem.SetDisplayInfo(dInfo);
 	}
