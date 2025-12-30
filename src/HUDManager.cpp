@@ -102,7 +102,7 @@ void HUDManager::InstallHooks()
 void HUDManager::Reset()
 {
 	Settings::GetSingleton()->Load();
-	_userWantsVisible = false;
+	_wasHidden = true;
 	_currentAlpha = 0.0f;
 	_targetAlpha = 0.0f;
 	_ctxAlpha = 0.0f;
@@ -112,10 +112,9 @@ void HUDManager::Reset()
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
 
-	if (_loadGracePeriod == 0.0f) {
+	if (_loadGracePeriod <= 0.0f) {
 		_loadGracePeriod = 2.0f;
 	}
-	logger::info("HUDManager reset.");
 }
 
 void HUDManager::ScanIfReady()
