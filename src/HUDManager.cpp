@@ -730,8 +730,8 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		return;
 	}
 
-	bool shouldHideAll = ShouldHideHUD();
-	bool tdmActive = compat->IsTDMActive();
+	const bool menuOpen = ShouldHideHUD();
+	const bool tdmActive = compat->IsTDMActive();
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -740,16 +740,6 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		std::string menuNameStr(name.c_str());
 		if (menuNameStr == "HUD Menu") {
-			// Explicitly set the visibility of the whole HUD movie to prevent elements leaking through
-			if (shouldHideAll) {
-				if (entry.menu->uiMovie->GetVisible()) {
-					entry.menu->uiMovie->SetVisible(false);
-				}
-			} else {
-				if (!entry.menu->uiMovie->GetVisible()) {
-					entry.menu->uiMovie->SetVisible(true);
-				}
-			}
 			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha);
 			continue;
 		}
@@ -760,7 +750,11 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		int mode = settings->GetWidgetMode(menuNameStr);
 
-		// Skip external menu if Ignored
+		// Menus active: relinquish control of external menus.
+		if (menuOpen && mode != Settings::kHidden) {
+			continue;
+		}
+
 		if (mode == Settings::kIgnored) {
 			continue;
 		}
@@ -772,40 +766,17 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		RE::GFxValue::DisplayInfo dInfo;
 
-		// Force hide for external menus if system menus are open.
-		if (shouldHideAll) {
-			if (entry.menu->uiMovie->GetVisible()) {
-				entry.menu->uiMovie->SetVisible(false);
-			}
-			dInfo.SetAlpha(0.0);
-			root.SetDisplayInfo(dInfo);
-			continue;
-		}
-
 		if (mode == Settings::kVisible) {
-			if (!entry.menu->uiMovie->GetVisible()) {
-				entry.menu->uiMovie->SetVisible(true);
-			}
 			dInfo.SetAlpha(100.0);
-			root.SetDisplayInfo(dInfo);
-			continue;
-		}
-
-		if (mode == Settings::kHidden) {
-			if (entry.menu->uiMovie->GetVisible()) {
-				entry.menu->uiMovie->SetVisible(false);
-			}
-		} else {  // Immersive
-			if (!entry.menu->uiMovie->GetVisible()) {
-				entry.menu->uiMovie->SetVisible(true);
-			}
-
+		} else if (mode == Settings::kHidden) {
+			dInfo.SetAlpha(0.0);
+		} else {
 			if (menuNameStr == "TrueHUD") {
 				dInfo.SetAlpha(tdmActive ? 100.0 : a_alpha);
 			} else {
 				dInfo.SetAlpha(a_alpha);
 			}
-			root.SetDisplayInfo(dInfo);
 		}
+		root.SetDisplayInfo(dInfo);
 	}
 }
