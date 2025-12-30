@@ -54,7 +54,14 @@ namespace Utils
 		}
 
 		if (!a_path.empty()) {
+			// Only fix purely lowercase strings.
+			bool hasUpper = std::any_of(a_path.begin(), a_path.end(), [](unsigned char c) {
+				return std::isupper(c);
+			});
+
+			if (!hasUpper) {
 			a_path[0] = static_cast<char>(toupper(static_cast<unsigned char>(a_path[0])));
+			}
 		}
 
 		return a_path;
