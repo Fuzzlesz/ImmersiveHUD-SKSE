@@ -237,7 +237,7 @@ void HUDManager::Update(float a_delta)
 	// Crosshair Target Alpha
 	float targetCtx = 0.0f;
 	if (settings->GetCrosshairSettings().enabled) {
-		if (shouldHide || compat->IsTDMActive()) {
+		if (compat->IsTDMActive()) {
 			targetCtx = 0.0f;
 		} else {
 			bool actionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
