@@ -3,6 +3,15 @@
 
 namespace Utils
 {
+	// Blocklist to help against recursion and snagging junk/crashing.
+	static const std::unordered_set<std::string> kDiscoveryBlockList = {
+		"markerData",
+		"widgetLoaderContainer",
+		"HUDMovieBaseInstance",
+		"aCompassMarkerList",
+		"HUDHooksContainer"
+	};
+
 	std::string SanitizeName(const std::string& a_name)
 	{
 		std::string clean = a_name;
@@ -60,7 +69,7 @@ namespace Utils
 			});
 
 			if (!hasUpper) {
-			a_path[0] = static_cast<char>(toupper(static_cast<unsigned char>(a_path[0])));
+				a_path[0] = static_cast<char>(toupper(static_cast<unsigned char>(a_path[0])));
 			}
 		}
 
@@ -186,11 +195,7 @@ namespace Utils
 		}
 		std::string name(a_name);
 
-		static const std::unordered_set<std::string> kSkipList = {
-			"aCompassMarkerList"
-		};
-
-		if (kSkipList.contains(name) || name.starts_with("instance")) {
+		if (kDiscoveryBlockList.contains(name) || name.starts_with("instance")) {
 			return;
 		}
 
@@ -249,16 +254,7 @@ namespace Utils
 		}
 		std::string name(a_name);
 
-		// Block volatile or internal containers to prevent crashes and scanning junk.
-		static const std::unordered_set<std::string> kBlockList = {
-			"markerData",
-			"widgetLoaderContainer",
-			"HUDMovieBaseInstance",
-			"aCompassMarkerList",
-			"HUDHooksContainer"
-		};
-
-		if (kBlockList.contains(name)) {
+		if (kDiscoveryBlockList.contains(name)) {
 			return;
 		}
 
