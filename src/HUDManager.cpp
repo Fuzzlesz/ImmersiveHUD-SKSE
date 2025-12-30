@@ -111,10 +111,6 @@ void HUDManager::Reset()
 	_enchantAlphaR = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
-
-	if (_loadGracePeriod <= 0.0f) {
-		_loadGracePeriod = 2.0f;
-	}
 }
 
 void HUDManager::ScanIfReady()
@@ -185,19 +181,6 @@ void HUDManager::Update(float a_delta)
 	const auto compat = Compat::GetSingleton();
 	if (!player) {
 		return;
-	}
-
-	// Grace period for initial load
-	if (_loadGracePeriod > 0.0f) {
-		_loadGracePeriod -= a_delta;
-		if (_loadGracePeriod <= 0.0f) {
-			_loadGracePeriod = -1.0f;  // Transition to Runtime state after scan
-
-			SKSE::GetTaskInterface()->AddUITask([this]() {
-				ScanForWidgets(false, true);  // Deep scan
-			});
-			logger::info("Grace period ended. Rescanning.");
-		}
 	}
 
 	// Periodic scan
@@ -524,8 +507,8 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
 	if (changes || a_forceUpdate) {
 		Settings::GetSingleton()->Load();
 
-		// Use _loadGracePeriod to determine Init vs Runtime state for MCMGen status
-		MCMGen::Update(_loadGracePeriod < 0.0f);
+		// Use _hasScanned to determine if this is the first discovery or a runtime update
+		MCMGen::Update(_hasScanned);
 
 		if (changes) {
 			logger::info("Scan complete (Deep={}). Found {} external, {} internal.", a_deepScan, externalCount, containerCount);
