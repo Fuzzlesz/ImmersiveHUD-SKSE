@@ -18,35 +18,39 @@ namespace
 	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
 	{
 	public:
-		VisibilityHammer(bool a_skipFills = false) :
-			_skipFills(a_skipFills) {}
+		VisibilityHammer(bool a_forceVisible = false) :
+			_forceVisible(a_forceVisible)
+		{}
 
 		void Visit(const char* a_name, const RE::GFxValue& a_val) override
 		{
 			if (a_val.IsDisplayObject()) {
-				std::string name = a_name ? a_name : "";
+				std::string name = a_name ? a_name : "unnamed";
 				std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-
-				if (_skipFills) {
-					// Skip internal bar 'fills' for HMS and Enemy Health to allow draining animations.
-					if (name == "metermovieclip" || name == "penaltymetermovieclip" ||
-						name == "blinkmovieclip" || name.find("meter_mc") != std::string::npos ||
-						name.find("penaltymeter_mc") != std::string::npos) {
-						return;
-					}
-				}
 
 				RE::GFxValue::DisplayInfo d;
 				const_cast<RE::GFxValue&>(a_val).GetDisplayInfo(&d);
-				d.SetVisible(true);
-				d.SetAlpha(100.0);
+
+				if (_forceVisible) {
+					// Override internal ActionScript visibility to prevent auto-hide.
+					d.SetVisible(true);
+
+					// Only apply alpha to static components; preserve animation for warning states.
+					bool isAnimated = (name.find("flash") != std::string::npos ||
+									   name.find("blink") != std::string::npos ||
+									   name.find("penalty") != std::string::npos);
+
+					if (!isAnimated) {
+						d.SetAlpha(100.0);
+					}
+				}
+
 				const_cast<RE::GFxValue&>(a_val).SetDisplayInfo(d);
-				const_cast<RE::GFxValue&>(a_val).VisitMembers(this);
 			}
 		}
 
 	private:
-		bool _skipFills;
+		bool _forceVisible;
 	};
 }
 
@@ -188,7 +192,7 @@ void HUDManager::Update(float a_delta)
 	if (_loadGracePeriod > 0.0f) {
 		_loadGracePeriod -= a_delta;
 		if (_loadGracePeriod <= 0.0f) {
-			_loadGracePeriod = -1.0f; // Transition to Runtime state after scan
+			_loadGracePeriod = -1.0f;  // Transition to Runtime state after scan
 
 			SKSE::GetTaskInterface()->AddUITask([this]() {
 				ScanForWidgets(false, true);  // Deep scan
