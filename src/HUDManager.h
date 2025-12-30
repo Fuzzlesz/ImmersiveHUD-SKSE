@@ -26,10 +26,10 @@ public:
 private:
 	// Alpha Application Logic
 	void ApplyAlphaToHUD(float a_globalAlpha);
-	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll);
+	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha);
 
 	// Child Visibility Enforcement
-	void EnforceHMSMeterVisible(RE::GFxValue& a_parent);
+	void EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent);
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
 
 	// Internal Scanning Logic

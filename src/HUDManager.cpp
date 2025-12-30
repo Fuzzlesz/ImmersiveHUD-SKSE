@@ -420,10 +420,10 @@ bool HUDManager::ShouldHideHUD()
 	return false;
 }
 
-void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent)
+void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent)
 {
 	if (a_parent.IsObject()) {
-		VisibilityHammer hammer(true);  // Protect HMS anims
+		VisibilityHammer hammer(a_forcePermanent);
 		a_parent.VisitMembers(&hammer);
 	}
 }
@@ -431,7 +431,7 @@ void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent)
 void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
 {
 	if (a_parent.IsObject()) {
-		VisibilityHammer hammer(false);  // Fix unlabelled enchant meter frames
+		VisibilityHammer hammer(true);  // Force visibility for enchant meters
 		a_parent.VisitMembers(&hammer);
 	}
 }
@@ -549,10 +549,14 @@ void HUDManager::DumpHUDStructure()
 	}
 }
 
-void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha, bool a_hideAll)
+void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha)
 {
 	const auto settings = Settings::GetSingleton();
 	const auto compat = Compat::GetSingleton();
+	const bool menuOpen = ShouldHideHUD();
+
+	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
+	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
 
 	// Local set to track paths processed in this frame and prevent growth leaks
 	std::unordered_set<std::string> processedPaths;
@@ -571,21 +575,31 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isEnchantLeft = (strcmp(def.id, "iMode_EnchantLeft") == 0);
 		bool isEnchantRight = (strcmp(def.id, "iMode_EnchantRight") == 0);
 		bool isEnchantSkyHUD = (strcmp(def.id, "iMode_EnchantCombined") == 0);
-		bool isEnemyHealth = (strcmp(def.id, "iMode_EnemyHealth") == 0);
-		bool isResourceBar = isHealth || isMagicka || isStamina || isEnemyHealth;
+		bool isResourceBar = isHealth || isMagicka || isStamina;
 		bool isCrosshair = def.isCrosshair;
 
 		for (const auto& path : def.paths) {
 			processedPaths.insert(path);
 
 			int mode = settings->GetWidgetMode(path);
-			RE::GFxValue elem;
 
-			if (!a_movie->GetVariable(&elem, path)) {
+			// Handle reset for ignored elements.
+			if (mode == Settings::kIgnored) {
+				RE::GFxValue elem;
+				if (a_movie->GetVariable(&elem, path) && elem.IsDisplayObject()) {
+					RE::GFxValue::DisplayInfo dInfo;
+					elem.GetDisplayInfo(&dInfo);
+					if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
+						dInfo.SetVisible(true);
+						dInfo.SetAlpha(100.0);
+						elem.SetDisplayInfo(dInfo);
+					}
+				}
 				continue;
 			}
 
-			if (!elem.IsDisplayObject()) {
+			RE::GFxValue elem;
+			if (!a_movie->GetVariable(&elem, path) || !elem.IsDisplayObject()) {
 				continue;
 			}
 
@@ -593,9 +607,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			elem.GetDisplayInfo(&dInfo);
 
 			bool shouldBeVisible = true;
-			double targetAlpha = a_globalAlpha;
+			double targetAlpha = managedAlpha;
 
-			if (a_hideAll || mode == Settings::kHidden) {
+			if (mode == Settings::kHidden) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
 			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
@@ -612,26 +626,29 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				else if (isEnchantSkyHUD)
 					trackedAlpha = std::max(_enchantAlphaL, _enchantAlphaR);
 
+				if (menuOpen)
+					trackedAlpha = 0.0f;
+
 				if (mode == Settings::kVisible) {
 					targetAlpha = trackedAlpha;
-				} else {  // Immersive
-					targetAlpha = std::min(trackedAlpha, static_cast<float>(a_globalAlpha));
+				} else {
+					targetAlpha = std::min(trackedAlpha, managedAlpha);
 				}
 				shouldBeVisible = (targetAlpha > 0.01);
 			} else if (mode == Settings::kVisible) {
-				shouldBeVisible = true;
-				targetAlpha = 100.0;
-			} else {  // Immersive
+				shouldBeVisible = !menuOpen;
+				targetAlpha = menuOpen ? 0.0 : 100.0;
+			} else {
 				if (isCrosshair) {
-					float ctxBased = (_ctxAlpha * 0.01f * 100.0f);
+					float ctxBased = (menuOpen ? 0.0f : _ctxAlpha);
 					if (compat->IsSmoothCamActive() && ctxBased > 0.01f) {
 						ctxBased = 0.01f;
 					}
 					targetAlpha = ctxBased;
 					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
-					shouldBeVisible = (a_globalAlpha > 0.0);
-					targetAlpha = a_globalAlpha;
+					shouldBeVisible = (managedAlpha > 0.01f);
+					targetAlpha = managedAlpha;
 				}
 			}
 
@@ -642,7 +659,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// Hammer fixes for nested children
 			if (shouldBeVisible && targetAlpha > 0.1) {
 				if (isResourceBar) {
-					EnforceHMSMeterVisible(elem);
+					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive));
 				} else if (isEnchantLeft || isEnchantRight || isEnchantSkyHUD) {
 					EnforceEnchantMeterVisible(elem);
 				}
@@ -663,14 +680,34 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		int mode = settings->GetWidgetMode(path);
-		RE::GFxValue elem;
 
+		// Menus active: relinquish control of dynamic widgets to allow 3rd party function.
+		if (menuOpen && mode != Settings::kHidden) {
+			continue;
+		}
+
+		// Handle reset for ignored widgets.
+		if (mode == Settings::kIgnored) {
+			RE::GFxValue elem;
+			if (a_movie->GetVariable(&elem, path.c_str()) && elem.IsDisplayObject()) {
+				RE::GFxValue::DisplayInfo dInfo;
+				elem.GetDisplayInfo(&dInfo);
+				if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
+					dInfo.SetVisible(true);
+					dInfo.SetAlpha(100.0);
+					elem.SetDisplayInfo(dInfo);
+				}
+			}
+			continue;
+		}
+
+		RE::GFxValue elem;
 		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
 			continue;
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
-		if (a_hideAll || mode == Settings::kHidden) {
+		if (mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
 			dInfo.SetAlpha(0.0);
 		} else if (mode == Settings::kVisible) {
@@ -713,7 +750,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 					entry.menu->uiMovie->SetVisible(true);
 				}
 			}
-			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha, shouldHideAll);
+			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha);
 			continue;
 		}
 
