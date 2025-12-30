@@ -481,7 +481,7 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 			continue;
 		}
 
-		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kModal, RE::IMenu::Flag::kApplicationMenu)) {
+		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kApplicationMenu)) {
 			continue;
 		}
 
