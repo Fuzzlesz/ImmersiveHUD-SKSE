@@ -94,15 +94,15 @@ namespace Utils
 	bool IsSystemMenu(const std::string& a_menuName)
 	{
 		static const std::unordered_set<std::string> systemMenus = {
-			"Console", "MapMenu", "InventoryMenu", "MagicMenu", "Journal Menu",
-			"TweenMenu", "Sleep/Wait Menu", "BarterMenu", "GiftMenu", "ContainerMenu",
-			"Lockpicking Menu", "Book Menu", "StatsMenu", "LevelUp Menu", "Crafting Menu",
-			"FavoritesMenu", "Mod Manager Menu", "Creation Club Menu", "TitleSequence Menu",
-			"Loading Menu", "Fader Menu", "Main Menu", "Mist Menu", "LoadWaitSpinner",
-			"Dialogue Menu", "MessageBoxMenu", "Cursor Menu", "Top Menu", "SafeZoneMenu",
-			"Credits Menu", "Tutorial Menu", "RaceSex Menu", "Kinect Menu",
-			"Console Native UI Menu", "CustomMenu", "CPECustomMenu", "PluginExplorerMenu",
-			"Training Menu", "MessageBoxMenu"
+			"LevelUp Menu", "Credits Menu", "TitleSequence Menu", "Fader Menu",
+			"Dialogue Menu", "Lockpicking Menu", "Creation Club Menu", "LoadWaitSpinner",
+			"MessageBoxMenu", "Cursor Menu", "Loading Menu", "Console",
+			"Training Menu", "Mist Menu", "Kinect Menu", "TweenMenu",
+			"BarterMenu", "Mod Manager Menu", "Journal Menu", "Tutorial Menu",
+			"SafeZoneMenu", "MapMenu", "Sleep/Wait Menu", "Console Native UI Menu",
+			"Book Menu", "FavoritesMenu", "GiftMenu", "MagicMenu",
+			"Crafting Menu", "ContainerMenu", "Main Menu", "InventoryMenu",
+			"RaceSex Menu"
 		};
 		return systemMenus.contains(a_menuName);
 	}
