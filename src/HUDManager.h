@@ -33,7 +33,7 @@ private:
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
 
 	// Internal Scanning Logic
-	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan);
+	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRuntime = true);
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
 
 	// Debugging

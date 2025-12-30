@@ -121,11 +121,15 @@ void HUDManager::ScanIfReady()
 	auto* ui = RE::UI::GetSingleton();
 	if (ui && ui->GetMenu("HUD Menu")) {
 		_isScanPending = true;
-		SKSE::GetTaskInterface()->AddUITask([this]() {
-			ScanForWidgets(false, false);
+
+		// Session initial scan: capture runtime status then flip scanned flag
+		bool isRuntime = _hasScanned;
+		_hasScanned = true;
+
+		SKSE::GetTaskInterface()->AddUITask([this, isRuntime]() {
+			ScanForWidgets(false, true, isRuntime);
 			_isScanPending = false;
 		});
-		_hasScanned = true;
 	}
 }
 
@@ -136,14 +140,14 @@ void HUDManager::RegisterNewMenu()
 	}
 	_isScanPending = true;
 	SKSE::GetTaskInterface()->AddUITask([this]() {
-		ScanForWidgets(false, false);
+		ScanForWidgets(false, true, true);
 		_isScanPending = false;
 	});
 }
 
 void HUDManager::ForceScan()
 {
-	ScanForWidgets(true, true);
+	ScanForWidgets(true, true, true);
 }
 
 void HUDManager::OnButtonDown()
@@ -189,7 +193,7 @@ void HUDManager::Update(float a_delta)
 		_scanTimer = 0.0f;
 		if (_hasScanned) {
 			SKSE::GetTaskInterface()->AddUITask([this]() {
-				ScanForWidgets(false, false);
+				ScanForWidgets(false, true, true);
 			});
 		}
 	}
@@ -438,7 +442,7 @@ void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount,
 	root.VisitMembers(&visitor);
 }
 
-void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
+void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRuntime)
 {
 	auto* ui = RE::UI::GetSingleton();
 	if (!ui) {
@@ -507,8 +511,8 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
 	if (changes || a_forceUpdate) {
 		Settings::GetSingleton()->Load();
 
-		// Use _hasScanned to determine if this is the first discovery or a runtime update
-		MCMGen::Update(_hasScanned);
+		// Use a_isRuntime to determine Init vs Runtime state for MCMGen status
+		MCMGen::Update(a_isRuntime);
 
 		if (changes) {
 			logger::info("Scan complete (Deep={}). Found {} external, {} internal.", a_deepScan, externalCount, containerCount);

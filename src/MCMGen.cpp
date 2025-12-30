@@ -56,7 +56,7 @@ namespace MCMGen
 		return false;
 	}
 
-json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
+	json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
 	{
 		return {
 			{ "text", a_text },
@@ -281,8 +281,9 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 			}
 
 			// 5. Calculate Status Flags
-			bool elementsRelaunch = (!newIniKeysElements.empty());
-			bool widgetsRelaunch = (!newIniKeysWidgets.empty() || _iniModifiedThisSession);
+			if (!a_isRuntime && (!newIniKeysElements.empty() || !newIniKeysWidgets.empty())) {
+				_iniModifiedThisSession = true;
+			}
 
 			// 6. Inject JSON Content
 			json* widgetsContent = nullptr;
@@ -299,8 +300,7 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 
 			if (elementsContent) {
 				elementsContent->clear();
-				// Strict !a_isRuntime check to prevent persistent invalid status
-				if (elementsRelaunch && !a_isRuntime) {
+				if (_iniModifiedThisSession) {
 					elementsContent->push_back({ { "text", "$fzIH_ElementNewFound" }, { "type", "text" }, { "id", "ElemStatus" } });
 				} else {
 					elementsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
@@ -314,8 +314,7 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 
 			if (widgetsContent) {
 				widgetsContent->clear();
-				// Strict !a_isRuntime check
-				if (widgetsRelaunch && !a_isRuntime) {
+				if (_iniModifiedThisSession) {
 					widgetsContent->push_back({ { "text", "$fzIH_WidgetNewFound" }, { "type", "text" }, { "id", "WidStatus" } });
 				} else {
 					widgetsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },
@@ -326,6 +325,7 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 					widgetsContent->push_back(widgetJson);
 				}
 			}
+
 			// 7. Write to Disk
 			if (config != originalConfig) {
 				std::ofstream outFile(configPath, std::ios::trunc);
