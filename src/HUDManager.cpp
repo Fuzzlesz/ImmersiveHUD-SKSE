@@ -326,12 +326,17 @@ void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_
 	}
 
 	const int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
+	const bool menuOpen = ShouldHideHUD();
+
+	if (widgetMode == Settings::kIgnored) {
+		return;
+	}
 
 	// Force hidden if HUD should be hidden, mode is Hidden, or global in esp is set
-	if (ShouldHideHUD() || widgetMode == Settings::kHidden || !compat->IsSneakAllowed()) {
+	if (menuOpen || widgetMode == Settings::kHidden || !compat->IsSneakAllowed()) {
 		RE::GFxValue::DisplayInfo d;
 		a_sneakAnim.GetDisplayInfo(&d);
-		if (d.GetVisible()) {
+		if (d.GetAlpha() > 0.0f || d.GetVisible()) {
 			d.SetVisible(false);
 			d.SetAlpha(0.0f);
 			a_sneakAnim.SetDisplayInfo(d);
@@ -486,6 +491,10 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan)
 		std::string menuName(name.c_str());
 
 		if (menuName == "HUD Menu" || Utils::IsSystemMenu(menuName)) {
+			continue;
+		}
+
+		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kModal, RE::IMenu::Flag::kApplicationMenu)) {
 			continue;
 		}
 

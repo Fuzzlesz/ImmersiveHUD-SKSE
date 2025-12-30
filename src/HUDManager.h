@@ -29,7 +29,7 @@ private:
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha);
 
 	// Child Visibility Enforcement
-	void EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent);
+	void EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent = false);
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
 
 	// Internal Scanning Logic
