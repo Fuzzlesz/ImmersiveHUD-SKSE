@@ -5,7 +5,7 @@
 #include "Settings.h"
 #include "Utils.h"
 
-	namespace Events
+namespace Events
 {
 	class InputEventSink : public RE::BSTEventSink<RE::InputEvent*>
 	{
@@ -81,10 +81,11 @@
 				return RE::BSEventNotifyControl::kContinue;
 			}
 
-			// Reload settings when Journal closes
-			if (a_event->menuName == RE::JournalMenu::MENU_NAME && !a_event->opening) {
-				Settings::GetSingleton()->Load();
-				HUDManager::GetSingleton()->Reset();
+			// Capture when menus close to refresh HUD state/reload settings
+			if (!a_event->opening) {
+				if (Utils::IsSystemMenu(a_event->menuName.c_str())) {
+					HUDManager::GetSingleton()->Reset();
+				}
 			}
 
 			if (a_event->opening) {
