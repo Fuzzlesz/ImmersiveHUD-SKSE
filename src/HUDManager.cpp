@@ -399,7 +399,12 @@ bool HUDManager::ShouldHideHUD()
 		return false;
 	}
 
-	// Always hide if these core conditions are met
+	// 1. Camera State Check (VATS, FreeCam, Auto-Vanity)
+	if (Compat::GetSingleton()->CameraStateCheck()) {
+		return true;
+	}
+
+	// 2. System UI Checks
 	if (ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen()) {
 		return true;
 	}

@@ -29,6 +29,7 @@ public:
 	bool IsPlayerWeaponDrawn();
 
 	// Player State Logic
+	bool CameraStateCheck();
 	bool IsCrosshairTargetValid();
 	bool IsPlayerCasting(RE::PlayerCharacter* a_player);
 	bool IsPlayerAttacking(RE::PlayerCharacter* a_player);

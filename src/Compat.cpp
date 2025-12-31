@@ -146,6 +146,28 @@ bool Compat::IsPlayerWeaponDrawn()
 	return player && player->IsWeaponDrawn();
 }
 
+bool Compat::CameraStateCheck()
+{
+	auto camera = RE::PlayerCamera::GetSingleton();
+	if (!camera || !camera->currentState) {
+		return false;
+	}
+
+	if (camera->currentState == camera->cameraStates[RE::CameraState::kVATS]) {
+		return true;
+	}
+
+	if (camera->IsInFreeCameraMode()) {
+		return true;
+	}
+
+	if (camera->currentState == camera->cameraStates[RE::CameraState::kAutoVanity]) {
+		return true;
+	}
+
+	return false;
+}
+
 bool Compat::IsCrosshairTargetValid()
 {
 	if (auto crosshairPickData = RE::CrosshairPickData::GetSingleton()) {
