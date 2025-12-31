@@ -93,9 +93,12 @@ void HUDManager::InstallHooks()
 	stl::write_vfunc<RE::PlayerCharacter, PlayerUpdateHook>();
 	stl::write_vfunc<RE::StealthMeter, StealthMeterHook>();
 
-	Settings::GetSingleton()->Load();
 	_userWantsVisible = false;
 	_installed = true;
+
+	// Initial state load and snap
+	Reset();
+
 	logger::info("HUDManager hooks installed.");
 }
 
@@ -111,6 +114,10 @@ void HUDManager::Reset()
 	_enchantAlphaR = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
+
+	// Call Update with 0 delta to calculate state and snap UI immediately.
+	// This eliminates delay/flicker when coming out of load screens or menus.
+	Update(0.0f);
 }
 
 void HUDManager::ScanIfReady()
@@ -188,13 +195,15 @@ void HUDManager::Update(float a_delta)
 	}
 
 	// Periodic scan
-	_scanTimer += a_delta;
-	if (_scanTimer > 2.0f) {
-		_scanTimer = 0.0f;
-		if (_hasScanned) {
-			SKSE::GetTaskInterface()->AddUITask([this]() {
-				ScanForWidgets(false, true, true);
-			});
+	if (a_delta > 0.0f) {
+		_scanTimer += a_delta;
+		if (_scanTimer > 2.0f) {
+			_scanTimer = 0.0f;
+			if (_hasScanned) {
+				SKSE::GetTaskInterface()->AddUITask([this]() {
+					ScanForWidgets(false, true, true);
+				});
+			}
 		}
 	}
 
@@ -239,14 +248,14 @@ void HUDManager::Update(float a_delta)
 	}
 
 	// 2. Handle Hidden State & Transitions
-	if (shouldHide) {
+	if (shouldHide && a_delta > 0.0f) {
 		_wasHidden = true;
 		compat->ManageSmoothCamControl(true);
 		SKSE::GetTaskInterface()->AddUITask([this]() { ApplyAlphaToHUD(0.0f); });
 		return;
 	}
 
-	// Snap to target instantly when coming out of a menu to match vanilla behaviour
+	// Snap to target instantly when coming out of a menu/loadscreen or during Reset()
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
 		_ctxAlpha = targetCtx;
@@ -257,43 +266,45 @@ void HUDManager::Update(float a_delta)
 
 	compat->ManageSmoothCamControl(false);
 
-	// 3. Mixed Math Calculations
-	const float fadeSpeed = settings->GetFadeSpeed();
-	const float change = fadeSpeed * (a_delta * 60.0f);
+	// 3. Mixed Math Calculations (Skip if a_delta is 0)
+	if (a_delta > 0.0f) {
+		const float fadeSpeed = settings->GetFadeSpeed();
+		const float change = fadeSpeed * (a_delta * 60.0f);
 
-	// Global HUD: Linear Math (Vanilla Feel)
-	if (std::abs(_currentAlpha - _targetAlpha) <= change) {
-		_currentAlpha = _targetAlpha;
-	} else if (_currentAlpha < _targetAlpha) {
-		_currentAlpha += change;
-	} else {
-		_currentAlpha -= change;
-	}
-
-	// Crosshair: Lerp Math (Smooth Feel)
-	_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
-	if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
-		_ctxAlpha = targetCtx;
-	}
-
-	// Enchantment: Linear Math
-	float targetEnL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
-	float targetEnR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
-
-	auto UpdateLinear = [&](float& a_current, float a_target) {
-		if (std::abs(a_current - a_target) <= change) {
-			a_current = a_target;
-		} else if (a_current < a_target) {
-			a_current += change;
+		// Global HUD: Linear Math (Vanilla Feel)
+		if (std::abs(_currentAlpha - _targetAlpha) <= change) {
+			_currentAlpha = _targetAlpha;
+		} else if (_currentAlpha < _targetAlpha) {
+			_currentAlpha += change;
 		} else {
-			a_current -= change;
+			_currentAlpha -= change;
 		}
-	};
-	UpdateLinear(_enchantAlphaL, targetEnL);
-	UpdateLinear(_enchantAlphaR, targetEnR);
 
-	_prevDelta = a_delta;
-	_timer += _prevDelta;
+		// Crosshair: Lerp Math (Smooth Feel)
+		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
+		if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
+			_ctxAlpha = targetCtx;
+		}
+
+		// Enchantment: Linear Math
+		float targetEnL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
+		float targetEnR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
+
+		auto UpdateLinear = [&](float& a_current, float a_target) {
+			if (std::abs(a_current - a_target) <= change) {
+				a_current = a_target;
+			} else if (a_current < a_target) {
+				a_current += change;
+			} else {
+				a_current -= change;
+			}
+		};
+		UpdateLinear(_enchantAlphaL, targetEnL);
+		UpdateLinear(_enchantAlphaR, targetEnR);
+
+		_prevDelta = a_delta;
+		_timer += _prevDelta;
+	}
 
 	SKSE::GetTaskInterface()->AddUITask([this, alpha = _currentAlpha]() {
 		ApplyAlphaToHUD(alpha);

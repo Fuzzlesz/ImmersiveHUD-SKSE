@@ -110,7 +110,7 @@ namespace Utils
 	bool IsSystemMenu(const std::string& a_menuName)
 	{
 		static const std::unordered_set<std::string> systemMenus = {
-			"LevelUp Menu", "Credits Menu", "TitleSequence Menu", "Fader Menu",
+			"LevelUp Menu", "Credits Menu", "TitleSequence Menu",
 			"Dialogue Menu", "Lockpicking Menu", "Creation Club Menu", "LoadWaitSpinner",
 			"MessageBoxMenu", "Cursor Menu", "Loading Menu", "Console",
 			"Training Menu", "Mist Menu", "Kinect Menu", "TweenMenu",

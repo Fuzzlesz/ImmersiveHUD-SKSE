@@ -81,20 +81,26 @@ namespace Events
 				return RE::BSEventNotifyControl::kContinue;
 			}
 
-			// Capture when menus close to refresh HUD state/reload settings
+			const char* menuName = a_event->menuName.c_str();
+
 			if (!a_event->opening) {
-				if (Utils::IsSystemMenu(a_event->menuName.c_str())) {
+				// Capture when menus close to refresh HUD state/reload settings
+				if (Utils::IsSystemMenu(menuName)) {
 					HUDManager::GetSingleton()->Reset();
 				}
 			}
 
 			if (a_event->opening) {
-				// 1. Force scan when HUD opens
-				if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
+				// 1. Snap HUD hidden immediately if a system menu opens
+				if (Utils::IsSystemMenu(menuName)) {
+					HUDManager::GetSingleton()->Reset();
+				}
+				// 2. Force scan when HUD opens
+				else if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
 					HUDManager::GetSingleton()->ScanIfReady();
 				}
-				// 2. Catch widgets appearing late
-				else if (!Utils::IsSystemMenu(a_event->menuName.c_str())) {
+				// 3. Catch widgets appearing late
+				else {
 					HUDManager::GetSingleton()->RegisterNewMenu();
 				}
 			}
