@@ -108,18 +108,28 @@ void HUDManager::InstallHooks()
 	stl::write_vfunc<RE::PlayerCharacter, PlayerUpdateHook>();
 	stl::write_vfunc<RE::StealthMeter, StealthMeterHook>();
 
-	_userWantsVisible = false;
+	// Load settings first so we can read the preference
+	Settings::GetSingleton()->Load();
+	_userWantsVisible = Settings::GetSingleton()->IsStartVisible();
+
 	_installed = true;
 
-	// Initial state load and snap
-	Reset();
+	// Initial state load and snap (Hard Reset)
+	Reset(true);
 
-	logger::info("HUDManager hooks installed.");
+	logger::info("HUDManager hooks installed. StartVisible: {}", _userWantsVisible);
 }
 
-void HUDManager::Reset()
+void HUDManager::Reset(bool a_refreshUserPreference)
 {
-	Settings::GetSingleton()->Load();
+	auto settings = Settings::GetSingleton();
+	settings->Load();
+
+	// Overwrite the toggle state on startup or save load
+	if (a_refreshUserPreference) {
+		_userWantsVisible = settings->IsStartVisible();
+	}
+
 	_wasHidden = true;
 	_currentAlpha = 0.0f;
 	_targetAlpha = 0.0f;

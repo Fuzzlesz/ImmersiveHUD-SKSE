@@ -57,6 +57,19 @@
           }
         },
         {
+          "type": "toggle",
+          "text": "$fzIH_StartVisible",
+          "id": "bStartVisible:HUD",
+          "help": "$fzIH_HelpStartVisible",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": false
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
           "type": "slider",
           "text": "$fzIH_FadeSpeed",
           "id": "iFadeSpeed:HUD",

@@ -5,7 +5,7 @@ class HUDManager : public ISingleton<HUDManager>
 public:
 	// Initialization and Hooks
 	void InstallHooks();
-	void Reset();
+	void Reset(bool a_refreshUserPreference = false);
 
 	// Widget Scanning and Discovery
 	void ScanIfReady();

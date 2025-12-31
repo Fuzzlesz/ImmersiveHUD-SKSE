@@ -28,13 +28,14 @@ public:
 
 	[[nodiscard]] std::uint32_t GetToggleKey() const { return _toggleKey; }
 	[[nodiscard]] bool IsHoldMode() const { return _holdMode; }
+	[[nodiscard]] bool IsStartVisible() const { return _startVisible; }
 	[[nodiscard]] bool IsAlwaysShowInCombat() const { return _alwaysShowInCombat; }
 	[[nodiscard]] bool IsAlwaysShowWeaponDrawn() const { return _alwaysShowWeaponDrawn; }
 	[[nodiscard]] float GetFadeSpeed() const { return _fadeSpeed; }
 	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
-
+	
 	[[nodiscard]] const std::set<std::string>& GetSubWidgetPaths() const;
 	[[nodiscard]] std::string GetWidgetSource(const std::string& a_path) const;
 
@@ -44,6 +45,7 @@ public:
 private:
 	std::uint32_t _toggleKey = 0x2D;
 	bool _holdMode = false;
+	bool _startVisible = false;
 	bool _alwaysShowInCombat = false;
 	bool _alwaysShowWeaponDrawn = false;
 	float _fadeSpeed = 5.0f;

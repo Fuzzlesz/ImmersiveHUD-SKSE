@@ -24,6 +24,7 @@ void Settings::Load()
 	const char* sectionHUD = "HUD";
 	_toggleKey = ini.GetLongValue(sectionHUD, "iToggleKey", 45);
 	_holdMode = ini.GetBoolValue(sectionHUD, "bHoldMode", false);
+	_startVisible = ini.GetBoolValue(sectionHUD, "bStartVisible", false);
 	_alwaysShowInCombat = ini.GetBoolValue(sectionHUD, "bShowInCombat", false);
 	_alwaysShowWeaponDrawn = ini.GetBoolValue(sectionHUD, "bShowWeaponDrawn", false);
 	_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));

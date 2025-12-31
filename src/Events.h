@@ -75,7 +75,7 @@ namespace Events
 			}
 		}
 
-		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override
+    RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override
 		{
 			if (!a_event) {
 				return RE::BSEventNotifyControl::kContinue;
@@ -86,14 +86,14 @@ namespace Events
 			if (!a_event->opening) {
 				// Capture when menus close to refresh HUD state/reload settings
 				if (Utils::IsSystemMenu(menuName)) {
-					HUDManager::GetSingleton()->Reset();
+					HUDManager::GetSingleton()->Reset(false);
 				}
 			}
 
 			if (a_event->opening) {
 				// 1. Snap HUD hidden immediately if a system menu opens
 				if (Utils::IsSystemMenu(menuName)) {
-					HUDManager::GetSingleton()->Reset();
+					HUDManager::GetSingleton()->Reset(false);
 				}
 				// 2. Force scan when HUD opens
 				else if (a_event->menuName == RE::HUDMenu::MENU_NAME) {

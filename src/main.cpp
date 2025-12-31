@@ -51,7 +51,7 @@ void OnInit(SKSE::MessagingInterface::Message* a_msg)
 
 	case SKSE::MessagingInterface::kPostLoadGame:
 		HUDManager::GetSingleton()->ScanIfReady();
-		HUDManager::GetSingleton()->Reset();
+		HUDManager::GetSingleton()->Reset(true);
 		break;
 	}
 }
