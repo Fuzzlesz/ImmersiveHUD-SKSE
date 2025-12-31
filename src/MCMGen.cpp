@@ -2,9 +2,7 @@
 #include "HUDElements.h"
 #include "Settings.h"
 #include "Utils.h"
-#include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 namespace MCMGen

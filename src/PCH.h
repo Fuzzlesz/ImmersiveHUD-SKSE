@@ -15,6 +15,7 @@
 
 #include <numbers>
 #include <unordered_set>
+#include <nlohmann/json.hpp>
 
 #define DLLEXPORT __declspec(dllexport)
 
@@ -24,6 +25,7 @@ namespace dist = clib_util::distribution;
 
 using namespace std::literals;
 using namespace clib_util::singleton;
+using json = nlohmann::json;
 
 namespace stl
 {
