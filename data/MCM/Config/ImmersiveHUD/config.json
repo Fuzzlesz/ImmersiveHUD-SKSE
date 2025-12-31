@@ -37,13 +37,17 @@
           }
         },
         {
-          "type": "toggle",
-          "text": "$fzIH_HoldMode",
-          "id": "bHoldMode:HUD",
-          "help": "$fzIH_HelpHoldMode",
+          "type": "slider",
+          "text": "$fzIH_DisplayDuration",
+          "id": "fDisplayDuration:HUD",
+          "help": "$fzIH_HelpDisplayDuration",
           "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": false
+            "sourceType": "ModSettingFloat",
+            "defaultValue": 0.0,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.5,
+            "formatString": "{1}s"
           }
         },
         {
@@ -55,6 +59,19 @@
             "sourceType": "ModSettingBool",
             "defaultValue": true
           }
+        },
+        {
+          "type": "toggle",
+          "text": "$fzIH_HoldMode",
+          "id": "bHoldMode:HUD",
+          "help": "$fzIH_HelpHoldMode",
+          "valueOptions": {
+            "sourceType": "ModSettingBool",
+            "defaultValue": false
+          }
+        },
+        {
+          "type": "empty"
         },
         {
           "type": "toggle",

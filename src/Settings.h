@@ -32,10 +32,11 @@ public:
 	[[nodiscard]] bool IsAlwaysShowInCombat() const { return _alwaysShowInCombat; }
 	[[nodiscard]] bool IsAlwaysShowWeaponDrawn() const { return _alwaysShowWeaponDrawn; }
 	[[nodiscard]] float GetFadeSpeed() const { return _fadeSpeed; }
+	[[nodiscard]] float GetDisplayDuration() const { return _displayDuration; }
 	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
-	
+
 	[[nodiscard]] const std::set<std::string>& GetSubWidgetPaths() const;
 	[[nodiscard]] std::string GetWidgetSource(const std::string& a_path) const;
 
@@ -49,6 +50,7 @@ private:
 	bool _alwaysShowInCombat = false;
 	bool _alwaysShowWeaponDrawn = false;
 	float _fadeSpeed = 5.0f;
+	float _displayDuration = 0.0f;
 	bool _dumpHUD = false;
 
 	CrosshairSettings _crosshair;

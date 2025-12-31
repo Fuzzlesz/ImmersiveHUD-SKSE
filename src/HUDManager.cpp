@@ -139,6 +139,7 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_enchantAlphaR = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
+	_displayTimer = 0.0f;
 
 	// Call Update with 0 delta to calculate state and snap UI immediately.
 	// This eliminates delay/flicker when coming out of load screens or menus.
@@ -184,16 +185,26 @@ void HUDManager::ForceScan()
 
 void HUDManager::OnButtonDown()
 {
-	if (Settings::GetSingleton()->IsDumpHUDEnabled()) {
+	const auto settings = Settings::GetSingleton();
+
+	if (settings->IsDumpHUDEnabled()) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			DumpHUDStructure();
 		});
 	}
 
-	if (Settings::GetSingleton()->IsHoldMode()) {
+	if (settings->IsHoldMode()) {
 		_userWantsVisible = true;
 	} else {
 		_userWantsVisible = !_userWantsVisible;
+
+		// If turning ON and a duration is set, start the countdown
+		if (_userWantsVisible && settings->GetDisplayDuration() > 0.0f) {
+			_displayTimer = settings->GetDisplayDuration();
+		} else {
+			// Turning OFF manually kills any active timer
+			_displayTimer = 0.0f;
+		}
 	}
 }
 
@@ -201,6 +212,7 @@ void HUDManager::OnButtonUp()
 {
 	if (Settings::GetSingleton()->IsHoldMode()) {
 		_userWantsVisible = false;
+		_displayTimer = 0.0f;
 	}
 }
 
@@ -217,6 +229,17 @@ void HUDManager::Update(float a_delta)
 	const auto compat = Compat::GetSingleton();
 	if (!player) {
 		return;
+	}
+
+	const auto settings = Settings::GetSingleton();
+
+	// Timed display logic: decrement timer and toggle visibility off when expired
+	if (_displayTimer > 0.0f && !settings->IsHoldMode()) {
+		_displayTimer -= a_delta;
+		if (_displayTimer <= 0.0f) {
+			_displayTimer = 0.0f;
+			_userWantsVisible = false;
+		}
 	}
 
 	// Periodic scan
@@ -242,7 +265,6 @@ void HUDManager::Update(float a_delta)
 	}
 
 	const bool shouldHide = ShouldHideHUD();
-	const auto settings = Settings::GetSingleton();
 
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;

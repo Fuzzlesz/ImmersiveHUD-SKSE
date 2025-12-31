@@ -69,6 +69,7 @@ private:
 	float _prevDelta = 0.0f;
 	float _timer = 0.0f;
 	float _scanTimer = 0.0f;
+	float _displayTimer = 0.0f;
 
 	// Stealth State Cache
 	RE::GFxValue _cachedSneakAnim;
