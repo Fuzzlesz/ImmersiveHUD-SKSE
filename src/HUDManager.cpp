@@ -715,8 +715,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
 		} else {
-			dInfo.SetVisible(a_globalAlpha > 0.1f);
-			dInfo.SetAlpha(a_globalAlpha);
+			dInfo.SetVisible(managedAlpha > 0.1f);
+			dInfo.SetAlpha(managedAlpha);
 		}
 		elem.SetDisplayInfo(dInfo);
 	}
