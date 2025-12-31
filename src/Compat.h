@@ -26,6 +26,7 @@ public:
 
 	// State Context Helpers
 	bool HasEnchantedWeapon(bool a_leftHand);
+	bool IsEnchantmentFull(bool a_leftHand);
 	bool IsPlayerWeaponDrawn();
 
 	// Player State Logic

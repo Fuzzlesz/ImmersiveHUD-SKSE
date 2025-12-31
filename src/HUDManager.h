@@ -28,6 +28,17 @@ private:
 	void ApplyAlphaToHUD(float a_globalAlpha);
 	void ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha);
 
+	// Enchantment Bar Helper Functions
+	bool IsEnchantmentElement(const char* a_elementId, bool& a_isLeft, bool& a_isRight, bool& a_isSkyHUD) const;
+	float CalculateEnchantmentIgnoredAlpha(bool a_isEnchantLeft,
+		bool a_isEnchantSkyHUD, bool a_menuOpen, float a_alphaL, float a_alphaR) const;
+	void ApplySkyHUDSubMeter(RE::GFxValue& a_parent, const char* a_memberName,
+		bool a_shouldBeVisible, bool a_callHammer);
+	void ApplySkyHUDEnchantment(RE::GFxValue& a_elem, float a_alphaL, float a_alphaR,
+		float a_managedAlpha, int a_mode, bool a_isIgnoredMode);
+	double CalculateEnchantmentTargetAlpha(bool a_isEnchantLeft,
+		bool a_isEnchantSkyHUD, int a_mode, float a_alphaL, float a_alphaR, double a_managedAlpha) const;
+
 	// Child Visibility Enforcement
 	void EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent = false);
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);

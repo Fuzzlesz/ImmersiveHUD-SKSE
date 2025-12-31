@@ -1,7 +1,7 @@
+#include "HUDManager.h"
 #include "Compat.h"
 #include "Events.h"
 #include "HUDElements.h"
-#include "HUDManager.h"
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -18,39 +18,54 @@ namespace
 	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
 	{
 	public:
-		VisibilityHammer(bool a_forceVisible = false) :
-			_forceVisible(a_forceVisible)
+		VisibilityHammer(bool a_forceVisible = false, int a_depth = 1) :
+			_forceVisible(a_forceVisible),
+			_depth(a_depth)
 		{}
 
 		void Visit(const char* a_name, const RE::GFxValue& a_val) override
 		{
 			if (a_val.IsDisplayObject()) {
-				std::string name = a_name ? a_name : "unnamed";
-				std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-
-				RE::GFxValue::DisplayInfo d;
-				const_cast<RE::GFxValue&>(a_val).GetDisplayInfo(&d);
-
 				if (_forceVisible) {
-					// Override internal ActionScript visibility to prevent auto-hide.
-					d.SetVisible(true);
+					std::string lowerName = a_name ? a_name : "unnamed";
+					std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 
-					// Only apply alpha to static components; preserve animation for warning states.
-					bool isAnimated = (name.find("flash") != std::string::npos ||
-									   name.find("blink") != std::string::npos ||
-									   name.find("penalty") != std::string::npos);
+					RE::GFxValue::DisplayInfo d;
+					auto& obj = const_cast<RE::GFxValue&>(a_val);
+					obj.GetDisplayInfo(&d);
 
-					if (!isAnimated) {
+					bool changed = false;
+					if (!d.GetVisible()) {
+						d.SetVisible(true);
+						changed = true;
+					}
+
+					// Protect penalty bars: low-health/survival blinking uses these names.
+					bool isAnimated = (lowerName.find("flash") != std::string::npos ||
+									   lowerName.find("blink") != std::string::npos ||
+									   lowerName.find("penalty") != std::string::npos);
+
+					// Force 100 alpha to skip vanilla fade-ins while ScaleX handles draining.
+					if (!isAnimated && d.GetAlpha() < 100.0) {
 						d.SetAlpha(100.0);
+						changed = true;
+					}
+
+					if (changed)
+						obj.SetDisplayInfo(d);
+
+					// Recurse to handle nested clips (e.g. ChargeMeter_mc).
+					if (_depth > 0) {
+						VisibilityHammer subHammer(_forceVisible, _depth - 1);
+						obj.VisitMembers(&subHammer);
 					}
 				}
-
-				const_cast<RE::GFxValue&>(a_val).SetDisplayInfo(d);
 			}
 		}
 
 	private:
 		bool _forceVisible;
+		int _depth;
 	};
 }
 
@@ -247,6 +262,21 @@ void HUDManager::Update(float a_delta)
 		targetCtx = _targetAlpha;
 	}
 
+	// Enchantment Target Logic
+	const bool weaponsActive = compat->IsPlayerWeaponDrawn();
+	const bool leftEnch = compat->HasEnchantedWeapon(true);
+	const bool rightEnch = compat->HasEnchantedWeapon(false);
+
+	float targetEnL = (weaponsActive && leftEnch) ? 100.0f : 0.0f;
+	float targetEnR = (weaponsActive && rightEnch) ? 100.0f : 0.0f;
+
+	// Dual-wield handshaking: forces synchronous fading regardless of equipment delay.
+	if (weaponsActive && leftEnch && rightEnch) {
+		float highest = std::max(_enchantAlphaL, _enchantAlphaR);
+		_enchantAlphaL = highest;
+		_enchantAlphaR = highest;
+	}
+
 	// 2. Handle Hidden State & Transitions
 	if (shouldHide && a_delta > 0.0f) {
 		_wasHidden = true;
@@ -255,12 +285,12 @@ void HUDManager::Update(float a_delta)
 		return;
 	}
 
-	// Snap to target instantly when coming out of a menu/loadscreen or during Reset()
+	// Snap to target instantly when coming out of a menu or loading to match vanilla behaviour
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
 		_ctxAlpha = targetCtx;
-		_enchantAlphaL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
-		_enchantAlphaR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
+		_enchantAlphaL = targetEnL;
+		_enchantAlphaR = targetEnR;
 		_wasHidden = false;
 	}
 
@@ -287,9 +317,6 @@ void HUDManager::Update(float a_delta)
 		}
 
 		// Enchantment: Linear Math
-		float targetEnL = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(true)) ? 100.0f : 0.0f;
-		float targetEnR = (compat->IsPlayerWeaponDrawn() && compat->HasEnchantedWeapon(false)) ? 100.0f : 0.0f;
-
 		auto UpdateLinear = [&](float& a_current, float a_target) {
 			if (std::abs(a_current - a_target) <= change) {
 				a_current = a_target;
@@ -428,19 +455,110 @@ bool HUDManager::ShouldHideHUD()
 	return false;
 }
 
+// Depth 0 is critical: protects Survival penalties and resource blinking from freezing.
 void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent)
 {
 	if (a_parent.IsObject()) {
-		VisibilityHammer hammer(a_forcePermanent);
+		VisibilityHammer hammer(a_forcePermanent, 0);
 		a_parent.VisitMembers(&hammer);
 	}
 }
 
+// Depth 1 is critical: reaches ChargeMeter_mc to kill vanilla auto-hide logic.
 void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
 {
 	if (a_parent.IsObject()) {
-		VisibilityHammer hammer(true);  // Force visibility for enchant meters
+		VisibilityHammer hammer(true, 1);
 		a_parent.VisitMembers(&hammer);
+	}
+}
+
+// ==========================================
+// Enchantment Bar Helpers
+// ==========================================
+
+bool HUDManager::IsEnchantmentElement(const char* a_elementId, bool& a_isLeft, bool& a_isRight, bool& a_isSkyHUD) const
+{
+	a_isLeft = (strcmp(a_elementId, "iMode_EnchantLeft") == 0);
+	a_isRight = (strcmp(a_elementId, "iMode_EnchantRight") == 0);
+	a_isSkyHUD = (strcmp(a_elementId, "iMode_EnchantCombined") == 0);
+
+	return a_isLeft || a_isRight || a_isSkyHUD;
+}
+
+// kIgnored block: simulates vanilla hide-when-full while fixing the reappear bug.
+float HUDManager::CalculateEnchantmentIgnoredAlpha(bool a_isEnchantLeft,
+	bool a_isEnchantSkyHUD, bool a_menuOpen, float a_alphaL, float a_alphaR) const
+{
+	const auto compat = Compat::GetSingleton();
+
+	if (a_isEnchantSkyHUD) {
+		return std::max(a_alphaL, a_alphaR);
+	} else {
+		bool full = a_isEnchantLeft ? compat->IsEnchantmentFull(true) : compat->IsEnchantmentFull(false);
+		float tracked = a_isEnchantLeft ? a_alphaL : a_alphaR;
+		return (a_menuOpen || full) ? 0.0f : tracked;
+	}
+}
+
+// Helper that handles visibility logic for a single SkyHUD sub-meter
+void HUDManager::ApplySkyHUDSubMeter(RE::GFxValue& a_parent, const char* a_memberName,
+	bool a_shouldBeVisible, bool a_callHammer)
+{
+	RE::GFxValue sub;
+	if (a_parent.GetMember(a_memberName, &sub)) {
+		RE::GFxValue::DisplayInfo s;
+		sub.GetDisplayInfo(&s);
+		s.SetVisible(a_shouldBeVisible);
+		s.SetAlpha(a_shouldBeVisible ? 100.0 : 0.0);
+		sub.SetDisplayInfo(s);
+		if (a_shouldBeVisible && a_callHammer) {
+			EnforceEnchantMeterVisible(sub);
+		}
+	}
+}
+
+// Unified method that handles both IgnoredMode and Hammer cases
+void HUDManager::ApplySkyHUDEnchantment(RE::GFxValue& a_elem, float a_alphaL, float a_alphaR,
+	float a_managedAlpha, int a_mode, bool a_isIgnoredMode)
+{
+	const auto compat = Compat::GetSingleton();
+
+	bool lVal, rVal;
+
+	if (a_isIgnoredMode) {
+		// IgnoredMode: check fullness state
+		bool lFull = compat->IsEnchantmentFull(true);
+		bool rFull = compat->IsEnchantmentFull(false);
+		lVal = (a_alphaL > 0.01f) && !lFull;
+		rVal = (a_alphaR > 0.01f) && !rFull;
+	} else {
+		// Hammer mode: check weapon drawn state and mode
+		bool drawn = compat->IsPlayerWeaponDrawn();
+		lVal = drawn && compat->HasEnchantedWeapon(true);
+		rVal = drawn && compat->HasEnchantedWeapon(false);
+
+		if (a_mode == Settings::kImmersive && a_managedAlpha < 0.1f) {
+			lVal = false;
+			rVal = false;
+		}
+	}
+
+	// Apply to all three sub-meters using helper
+	ApplySkyHUDSubMeter(a_elem, "ChargeMeterFrameAlt", lVal || rVal, true);
+	ApplySkyHUDSubMeter(a_elem, "ChargeMeterLeftAlt", lVal, true);
+	ApplySkyHUDSubMeter(a_elem, "ChargeMeterRightAlt", rVal, true);
+}
+
+double HUDManager::CalculateEnchantmentTargetAlpha(bool a_isEnchantLeft,
+	bool a_isEnchantSkyHUD, int a_mode, float a_alphaL, float a_alphaR, double a_managedAlpha) const
+{
+	float tracked = a_isEnchantSkyHUD ? std::max(a_alphaL, a_alphaR) : (a_isEnchantLeft ? a_alphaL : a_alphaR);
+
+	if (a_mode == Settings::kVisible) {
+		return tracked;
+	} else {
+		return std::min(tracked, static_cast<float>(a_managedAlpha));
 	}
 }
 
@@ -569,6 +687,21 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
+	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
+	const float alphaR = menuOpen ? 0.0f : _enchantAlphaR;
+
+	// One-time check: detect SkyHUD preference before hammer pollution.
+	static bool skyHUDCombinedActive = false;
+	static bool hasDetectedSkyHUD = false;
+	if (!hasDetectedSkyHUD) {
+		RE::GFxValue skyHUDContainer;
+		if (a_movie->GetVariable(&skyHUDContainer, "_root.HUDMovieBaseInstance.ChargeMeterBaseAlt")) {
+			RE::GFxValue::DisplayInfo cInfo;
+			skyHUDContainer.GetDisplayInfo(&cInfo);
+			skyHUDCombinedActive = cInfo.GetVisible();
+			hasDetectedSkyHUD = true;
+		}
+	}
 
 	// Local set to track paths processed in this frame and prevent growth leaks
 	std::unordered_set<std::string> processedPaths;
@@ -584,9 +717,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
-		bool isEnchantLeft = (strcmp(def.id, "iMode_EnchantLeft") == 0);
-		bool isEnchantRight = (strcmp(def.id, "iMode_EnchantRight") == 0);
-		bool isEnchantSkyHUD = (strcmp(def.id, "iMode_EnchantCombined") == 0);
+		bool isEnchantLeft, isEnchantRight, isEnchantSkyHUD;
+		bool isEnchantElement = IsEnchantmentElement(def.id, isEnchantLeft, isEnchantRight, isEnchantSkyHUD);
 		bool isResourceBar = isHealth || isMagicka || isStamina;
 		bool isCrosshair = def.isCrosshair;
 
@@ -595,21 +727,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			int mode = settings->GetWidgetMode(path);
 
-			// Handle reset for ignored elements.
-			if (mode == Settings::kIgnored) {
-				RE::GFxValue elem;
-				if (a_movie->GetVariable(&elem, path) && elem.IsDisplayObject()) {
-					RE::GFxValue::DisplayInfo dInfo;
-					elem.GetDisplayInfo(&dInfo);
-					if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
-						dInfo.SetVisible(true);
-						dInfo.SetAlpha(100.0);
-						elem.SetDisplayInfo(dInfo);
-					}
-				}
-				continue;
-			}
-
 			RE::GFxValue elem;
 			if (!a_movie->GetVariable(&elem, path) || !elem.IsDisplayObject()) {
 				continue;
@@ -617,6 +734,47 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			RE::GFxValue::DisplayInfo dInfo;
 			elem.GetDisplayInfo(&dInfo);
+
+			// Mutual Exclusion
+			if (skyHUDCombinedActive) {
+				if (isEnchantLeft || isEnchantRight) {
+					dInfo.SetVisible(false);
+					dInfo.SetAlpha(0.0);
+					elem.SetDisplayInfo(dInfo);
+					continue;
+				}
+			} else if (isEnchantSkyHUD) {
+				dInfo.SetVisible(false);
+				dInfo.SetAlpha(0.0);
+				elem.SetDisplayInfo(dInfo);
+				continue;
+			}
+
+			// kIgnored block: simulates vanilla hide-when-full while fixing the reappear bug.
+			if (mode == Settings::kIgnored && isEnchantElement) {
+				float target = CalculateEnchantmentIgnoredAlpha(isEnchantLeft, isEnchantSkyHUD, menuOpen, alphaL, alphaR);
+
+				if (isEnchantSkyHUD) {
+					ApplySkyHUDEnchantment(elem, alphaL, alphaR, 0.0f, 0, true);
+				}
+
+				dInfo.SetVisible(target > 0.01);
+				dInfo.SetAlpha(target);
+				elem.SetDisplayInfo(dInfo);
+				if (target > 0.1 && !isEnchantSkyHUD)
+					EnforceEnchantMeterVisible(elem);
+				continue;
+			}
+
+			// Handle reset for ignored elements.
+			if (mode == Settings::kIgnored) {
+				if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
+					dInfo.SetVisible(true);
+					dInfo.SetAlpha(100.0);
+					elem.SetDisplayInfo(dInfo);
+				}
+				continue;
+			}
 
 			bool shouldBeVisible = true;
 			double targetAlpha = managedAlpha;
@@ -627,25 +785,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
-			}
-			// Enchantment Logic: Context-aware Linear Transitions
-			else if (isEnchantLeft || isEnchantRight || isEnchantSkyHUD) {
-				float trackedAlpha = 0.0f;
-				if (isEnchantLeft)
-					trackedAlpha = _enchantAlphaL;
-				else if (isEnchantRight)
-					trackedAlpha = _enchantAlphaR;
-				else if (isEnchantSkyHUD)
-					trackedAlpha = std::max(_enchantAlphaL, _enchantAlphaR);
-
-				if (menuOpen)
-					trackedAlpha = 0.0f;
-
-				if (mode == Settings::kVisible) {
-					targetAlpha = trackedAlpha;
-				} else {
-					targetAlpha = std::min(trackedAlpha, managedAlpha);
-				}
+			} else if (isEnchantElement) {
+				targetAlpha = CalculateEnchantmentTargetAlpha(isEnchantLeft, isEnchantSkyHUD, mode, alphaL, alphaR, managedAlpha);
 				shouldBeVisible = (targetAlpha > 0.01);
 			} else if (mode == Settings::kVisible) {
 				shouldBeVisible = !menuOpen;
@@ -668,11 +809,13 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
-			// Hammer fixes for nested children
+			// Visibility Hammer: forces through ActionScript auto-hiding.
 			if (shouldBeVisible && targetAlpha > 0.1) {
 				if (isResourceBar) {
 					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive));
-				} else if (isEnchantLeft || isEnchantRight || isEnchantSkyHUD) {
+				} else if (isEnchantSkyHUD) {
+					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, managedAlpha, mode, false);
+				} else if (isEnchantLeft || isEnchantRight) {
 					EnforceEnchantMeterVisible(elem);
 				}
 			}

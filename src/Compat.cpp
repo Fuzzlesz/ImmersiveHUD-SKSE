@@ -140,10 +140,35 @@ bool Compat::HasEnchantedWeapon(bool a_leftHand)
 	return entryData && entryData->IsEnchanted();
 }
 
+bool Compat::IsEnchantmentFull(bool a_leftHand)
+{
+	auto player = RE::PlayerCharacter::GetSingleton();
+	if (!player)
+		return true;
+
+	auto av = a_leftHand ? RE::ActorValue::kLeftItemCharge : RE::ActorValue::kRightItemCharge;
+
+	float maxCharge = player->GetBaseActorValue(av);
+	float currentCharge = player->GetActorValue(av);
+
+	if (maxCharge <= 0.0f)
+		return true;
+
+	// 2.0f tolerance to handle engine rounding/float precision
+	return currentCharge >= (maxCharge - 2.0f);
+}
+
 bool Compat::IsPlayerWeaponDrawn()
 {
 	auto player = RE::PlayerCharacter::GetSingleton();
-	return player && player->IsWeaponDrawn();
+	if (!player)
+		return false;
+
+	// RE::ActorState is a base class of RE::Actor
+	auto state = player->GetWeaponState();
+
+	// We consider the weapon "Active" if it is out, being drawn, or being put away.
+	return state != RE::WEAPON_STATE::kSheathed && state != RE::WEAPON_STATE::kWantToSheathe;
 }
 
 bool Compat::CameraStateCheck()
