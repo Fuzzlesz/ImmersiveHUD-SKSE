@@ -105,9 +105,9 @@
         },
         {
           "type": "toggle",
-          "text": "$fzIH_ShowWeapon",
-          "id": "bShowWeaponDrawn:HUD",
-          "help": "$fzIH_HelpShowWeapon",
+          "text": "$fzIH_ShowCombat",
+          "id": "bShowInCombat:HUD",
+          "help": "$fzIH_HelpShowCombat",
           "valueOptions": {
             "sourceType": "ModSettingBool",
             "defaultValue": true
@@ -119,9 +119,9 @@
         },
         {
           "type": "toggle",
-          "text": "$fzIH_ShowCombat",
-          "id": "bShowInCombat:HUD",
-          "help": "$fzIH_HelpShowCombat",
+          "text": "$fzIH_ShowWeapon",
+          "id": "bShowWeaponDrawn:HUD",
+          "help": "$fzIH_HelpShowWeapon",
           "valueOptions": {
             "sourceType": "ModSettingBool",
             "defaultValue": true
