@@ -138,6 +138,7 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_enchantAlphaL = 0.0f;
 	_enchantAlphaR = 0.0f;
 	_combatAlpha = 0.0f;
+	_notInCombatAlpha = 0.0f;
 	_weaponAlpha = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
@@ -285,6 +286,7 @@ void HUDManager::Update(float a_delta)
 
 	// Per-element state targets for fancy linear fading
 	float targetCombat = isInCombat ? 100.0f : 0.0f;
+	float targetNotInCombat = !isInCombat ? 100.0f : 0.0f;
 	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
 
 	// Crosshair Target Alpha
@@ -331,6 +333,7 @@ void HUDManager::Update(float a_delta)
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
 		_combatAlpha = targetCombat;
+		_notInCombatAlpha = targetNotInCombat;
 		_weaponAlpha = targetWeapon;
 		_ctxAlpha = targetCtx;
 		_enchantAlphaL = targetEnL;
@@ -359,6 +362,7 @@ void HUDManager::Update(float a_delta)
 		// Global HUD & Enchantments: Linear Math (Vanilla Feel)
 		UpdateLinear(_currentAlpha, _targetAlpha);
 		UpdateLinear(_combatAlpha, targetCombat);
+		UpdateLinear(_notInCombatAlpha, targetNotInCombat);
 		UpdateLinear(_weaponAlpha, targetWeapon);
 		UpdateLinear(_enchantAlphaL, targetEnL);
 		UpdateLinear(_enchantAlphaR, targetEnR);
@@ -729,6 +733,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
+	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
 	const float alphaR = menuOpen ? 0.0f : _enchantAlphaR;
@@ -832,6 +837,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else if (mode == Settings::kInCombat) {
 				targetAlpha = combatAlpha;
 				shouldBeVisible = isInCombat && !menuOpen;
+			} else if (mode == Settings::kNotInCombat) {
+				targetAlpha = notInCombatAlpha;
+				shouldBeVisible = !isInCombat && !menuOpen;
 			} else if (mode == Settings::kWeaponDrawn) {
 				targetAlpha = weaponAlpha;
 				shouldBeVisible = isWeaponDrawn && !menuOpen;
@@ -865,7 +873,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// Visibility Hammer: Forces through ActionScript auto-hiding. Base logic on the state (shouldBeVisible) rather than fading alpha.
 			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
 				if (isResourceBar) {
-					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kWeaponDrawn));
+					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn));
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
 				} else if (isEnchantLeft || isEnchantRight) {
@@ -924,6 +932,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kInCombat) {
 			dInfo.SetVisible(combatAlpha > 0.01);
 			dInfo.SetAlpha(combatAlpha);
+		} else if (mode == Settings::kNotInCombat) {
+			dInfo.SetVisible(notInCombatAlpha > 0.01);
+			dInfo.SetAlpha(notInCombatAlpha);
 		} else if (mode == Settings::kWeaponDrawn) {
 			dInfo.SetVisible(weaponAlpha > 0.01);
 			dInfo.SetAlpha(weaponAlpha);
@@ -950,6 +961,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	// Use already calculated fading alphas
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
+	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -990,6 +1002,8 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			dInfo.SetAlpha(0.0);
 		} else if (mode == Settings::kInCombat) {
 			dInfo.SetAlpha(combatAlpha);
+		} else if (mode == Settings::kNotInCombat) {
+			dInfo.SetAlpha(notInCombatAlpha);
 		} else if (mode == Settings::kWeaponDrawn) {
 			dInfo.SetAlpha(weaponAlpha);
 		} else {

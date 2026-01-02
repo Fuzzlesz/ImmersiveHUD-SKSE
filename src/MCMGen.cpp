@@ -49,7 +49,7 @@ namespace MCMGen
 		return false;
 	}
 
-	json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
+json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
 	{
 		return {
 			{ "text", a_text },
@@ -63,6 +63,7 @@ namespace MCMGen
 												   "$fzIH_ModeHidden",
 												   "$fzIH_ModeIgnored",
 												   "$fzIH_ModeInCombat",
+												   "$fzIH_ModeNotInCombat",
 												   "$fzIH_ModeWeaponDrawn" }) } } }
 		};
 	}

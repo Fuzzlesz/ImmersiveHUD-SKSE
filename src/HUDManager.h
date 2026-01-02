@@ -65,6 +65,7 @@ private:
 	float _enchantAlphaL = 0.0f;
 	float _enchantAlphaR = 0.0f;
 	float _combatAlpha = 0.0f;
+	float _notInCombatAlpha = 0.0f;
 	float _weaponAlpha = 0.0f;
 
 	// Delta and Timer Tracking
