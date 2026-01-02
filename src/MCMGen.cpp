@@ -15,10 +15,25 @@ namespace MCMGen
 			return true;
 		}
 
-		if (a_source.ends_with(".swf") || a_source.ends_with(".SWF")) {
-			return true;
+		// Trust list for internal components or those likely to be in BSAs
+		std::string lowerPath = a_source;
+		std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+
+		static const std::vector<std::string> kTrustList = {
+			"internal/",
+			"skyui",
+			"hudmenu",
+			"vanilla",
+			"exported/"
+		};
+
+		for (const auto& w : kTrustList) {
+			if (lowerPath.find(w) != std::string::npos) {
+				return true;
+			}
 		}
 
+		// Check for loose files on disk to identify uninstalled mods
 		std::string path = a_source;
 		if (path.starts_with("file:///")) {
 			path = path.substr(8);
@@ -26,28 +41,8 @@ namespace MCMGen
 		std::replace(path.begin(), path.end(), '|', ':');
 		std::replace(path.begin(), path.end(), '\\', '/');
 
-		std::string lowerPath = path;
-		std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
-
-		static const std::vector<std::string> kInternalWhitelist = {
-			"internal/stealthmeter",
-			"internal/skyui widget",
-			"internal/skyui",
-			"hudmenu",
-			"hudmenu.swf",
-			"internal/vanilla"
-		};
-
-		for (const auto& w : kInternalWhitelist) {
-			if (lowerPath.find(w) != std::string::npos) {
-				return true;
-			}
-		}
-
-		fs::path dataPath = "Data";
 		std::error_code ec;
-
-		if (fs::exists(dataPath / path, ec)) {
+		if (fs::exists(fs::path("Data") / path, ec)) {
 			return true;
 		}
 
@@ -141,7 +136,7 @@ namespace MCMGen
 				config["pages"] = json::array();
 			}
 
-			// 2. Recover persisted paths from existing config
+			// 2. Recover persisted paths from existing config & prune dead entries
 			std::map<std::string, std::string> allPaths;
 
 			for (const auto& page : config["pages"]) {
@@ -153,6 +148,15 @@ namespace MCMGen
 							std::string sourceStr = "Unknown";
 							std::string rawID = "";
 
+
+							// Parse "Source: [URL]"
+							size_t srcPos = help.find("Source: ");
+							if (srcPos != std::string::npos) {
+								size_t endSrc = help.find('\n', srcPos);
+								sourceStr = help.substr(srcPos + 8, endSrc - (srcPos + 8));
+							}
+
+							// Parse "ID: [PATH]"
 							size_t idPos = help.find("ID: ");
 							if (idPos != std::string::npos) {
 								rawID = help.substr(idPos + 4);
@@ -162,14 +166,11 @@ namespace MCMGen
 							}
 
 							if (!rawID.empty()) {
-								if (help.starts_with("Source: ")) {
-									size_t endPos = help.find('\n');
-									if (endPos != std::string::npos) {
-										sourceStr = help.substr(8, endPos - 8);
-									}
-								}
+								// Keep entry if the mod is still installed, otherwise discard
 								if (WidgetSourceExists(sourceStr)) {
 									allPaths[rawID] = sourceStr;
+								} else {
+									logger::info("Pruning uninstalled widget: {} (Source: {})", rawID, sourceStr);
 								}
 							}
 						}
@@ -177,6 +178,7 @@ namespace MCMGen
 				}
 			}
 
+			// Merge in new runtime discovery data
 			const auto settings = Settings::GetSingleton();
 			auto memPaths = settings->GetSubWidgetPaths();
 			for (const auto& path : memPaths) {
@@ -187,21 +189,8 @@ namespace MCMGen
 			// 3. Generate Content for "HUD Elements" Page
 			std::vector<ElementSortEntry> validElements;
 			std::unordered_set<std::string> processedPaths;
-			const auto& knownPaths = settings->GetSubWidgetPaths();
 
 			for (const auto& def : HUDElements::Get()) {
-				bool isActive = false;
-				for (const auto& p : def.paths) {
-					if (knownPaths.contains(p)) {
-						isActive = true;
-						break;
-					}
-				}
-
-				if (!isActive) {
-					continue;
-				}
-
 				std::string iniKey = def.id;
 				std::string mcmID = iniKey + ":HUDElements";
 				std::string label = def.label;
@@ -231,7 +220,6 @@ namespace MCMGen
 			});
 
 			std::vector<json> elementsJsonList;
-			elementsJsonList.reserve(validElements.size());
 			for (const auto& entry : validElements) {
 				elementsJsonList.push_back(entry.data);
 			}
@@ -334,12 +322,8 @@ namespace MCMGen
 			}
 
 			if (iniLoaded || !fs::exists(iniPath)) {
-				if (!newIniKeysWidgets.empty()) {
-					SmartAppendIni(newIniKeysWidgets, "Widgets", iniPath, ini);
-				}
-				if (!newIniKeysElements.empty()) {
-					SmartAppendIni(newIniKeysElements, "HUDElements", iniPath, ini);
-				}
+				SmartAppendIni(newIniKeysWidgets, "Widgets", iniPath, ini);
+				SmartAppendIni(newIniKeysElements, "HUDElements", iniPath, ini);
 			}
 
 		} catch (...) {
