@@ -62,6 +62,8 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 												   "$fzIH_ModeImmersive",
 												   "$fzIH_ModeHidden",
 												   "$fzIH_ModeIgnored",
+												   "$fzIH_ModeInterior",
+												   "$fzIH_ModeExterior",
 												   "$fzIH_ModeInCombat",
 												   "$fzIH_ModeNotInCombat",
 												   "$fzIH_ModeWeaponDrawn" }) } } }

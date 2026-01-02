@@ -9,9 +9,11 @@ public:
 		kImmersive = 1,
 		kHidden = 2,
 		kIgnored = 3,
-		kInCombat = 4,
-		kNotInCombat = 5,
-		kWeaponDrawn = 6
+		kInterior = 4,
+		kExterior = 5,
+		kInCombat = 6,
+		kNotInCombat = 7,
+		kWeaponDrawn = 8
 	};
 
 	struct CrosshairSettings

@@ -137,6 +137,8 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_ctxSneakAlpha = 0.0f;
 	_enchantAlphaL = 0.0f;
 	_enchantAlphaR = 0.0f;
+	_interiorAlpha = 0.0f;
+	_exteriorAlpha = 0.0f;
 	_combatAlpha = 0.0f;
 	_notInCombatAlpha = 0.0f;
 	_weaponAlpha = 0.0f;
@@ -270,6 +272,7 @@ void HUDManager::Update(float a_delta)
 	const bool shouldHide = ShouldHideHUD();
 
 	// Cache immediate responsive states
+	const bool isInterior = player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
 	const bool isInCombat = player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
 
@@ -285,6 +288,8 @@ void HUDManager::Update(float a_delta)
 	_targetAlpha = shouldBeVisible ? 100.0f : 0.0f;
 
 	// Per-element state targets for fancy linear fading
+	float targetInterior = isInterior ? 100.0f : 0.0f;
+	float targetExterior = !isInterior ? 100.0f : 0.0f;
 	float targetCombat = isInCombat ? 100.0f : 0.0f;
 	float targetNotInCombat = !isInCombat ? 100.0f : 0.0f;
 	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
@@ -332,12 +337,14 @@ void HUDManager::Update(float a_delta)
 	// Snap to target instantly when coming out of a menu or loading to match vanilla behaviour
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
+		_enchantAlphaL = targetEnL;
+		_enchantAlphaR = targetEnR;
+		_interiorAlpha = targetInterior;
+		_exteriorAlpha = targetExterior;
 		_combatAlpha = targetCombat;
 		_notInCombatAlpha = targetNotInCombat;
 		_weaponAlpha = targetWeapon;
 		_ctxAlpha = targetCtx;
-		_enchantAlphaL = targetEnL;
-		_enchantAlphaR = targetEnR;
 		_wasHidden = false;
 	}
 
@@ -361,11 +368,13 @@ void HUDManager::Update(float a_delta)
 
 		// Global HUD & Enchantments: Linear Math (Vanilla Feel)
 		UpdateLinear(_currentAlpha, _targetAlpha);
+		UpdateLinear(_enchantAlphaL, targetEnL);
+		UpdateLinear(_enchantAlphaR, targetEnR);
+		UpdateLinear(_interiorAlpha, targetInterior);
+		UpdateLinear(_exteriorAlpha, targetExterior);
 		UpdateLinear(_combatAlpha, targetCombat);
 		UpdateLinear(_notInCombatAlpha, targetNotInCombat);
 		UpdateLinear(_weaponAlpha, targetWeapon);
-		UpdateLinear(_enchantAlphaL, targetEnL);
-		UpdateLinear(_enchantAlphaR, targetEnR);
 
 		// Crosshair: Lerp Math (Smooth Feel)
 		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
@@ -732,13 +741,16 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
+	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
+	const float alphaR = menuOpen ? 0.0f : _enchantAlphaR;
+	const float interiorAlpha = menuOpen ? 0.0f : _interiorAlpha;
+	const float exteriorAlpha = menuOpen ? 0.0f : _exteriorAlpha;
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
 	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
-	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
-	const float alphaR = menuOpen ? 0.0f : _enchantAlphaR;
 
 	// Immediate state checks for Visibility Hammer logic
+	const bool isInterior = player && player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
 	const bool isInCombat = player && player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
 
@@ -834,6 +846,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			if (mode == Settings::kHidden) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
+			} else if (mode == Settings::kInterior) {
+				targetAlpha = interiorAlpha;
+				shouldBeVisible = isInterior && !menuOpen;
+			} else if (mode == Settings::kExterior) {
+				targetAlpha = exteriorAlpha;
+				shouldBeVisible = !isInterior && !menuOpen;
 			} else if (mode == Settings::kInCombat) {
 				targetAlpha = combatAlpha;
 				shouldBeVisible = isInCombat && !menuOpen;
@@ -873,7 +891,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// Visibility Hammer: Forces through ActionScript auto-hiding. Base logic on the state (shouldBeVisible) rather than fading alpha.
 			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
 				if (isResourceBar) {
-					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn));
+					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn || mode == Settings::kInterior || mode == Settings::kExterior));
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
 				} else if (isEnchantLeft || isEnchantRight) {
@@ -929,6 +947,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
+		} else if (mode == Settings::kInterior) {
+			dInfo.SetVisible(interiorAlpha > 0.01);
+			dInfo.SetAlpha(interiorAlpha);
+		} else if (mode == Settings::kExterior) {
+			dInfo.SetVisible(exteriorAlpha > 0.01);
+			dInfo.SetAlpha(exteriorAlpha);
 		} else if (mode == Settings::kInCombat) {
 			dInfo.SetVisible(combatAlpha > 0.01);
 			dInfo.SetAlpha(combatAlpha);
@@ -959,6 +983,8 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	const bool tdmActive = compat->IsTDMActive();
 
 	// Use already calculated fading alphas
+	const float interiorAlpha = menuOpen ? 0.0f : _interiorAlpha;
+	const float exteriorAlpha = menuOpen ? 0.0f : _exteriorAlpha;
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
@@ -1000,6 +1026,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			dInfo.SetAlpha(100.0);
 		} else if (mode == Settings::kHidden) {
 			dInfo.SetAlpha(0.0);
+		} else if (mode == Settings::kInterior) {
+			dInfo.SetAlpha(interiorAlpha);
+		} else if (mode == Settings::kExterior) {
+			dInfo.SetAlpha(exteriorAlpha);
 		} else if (mode == Settings::kInCombat) {
 			dInfo.SetAlpha(combatAlpha);
 		} else if (mode == Settings::kNotInCombat) {

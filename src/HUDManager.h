@@ -64,6 +64,8 @@ private:
 	float _ctxSneakAlpha = 0.0f;
 	float _enchantAlphaL = 0.0f;
 	float _enchantAlphaR = 0.0f;
+	float _interiorAlpha = 0.0f;
+	float _exteriorAlpha = 0.0f;
 	float _combatAlpha = 0.0f;
 	float _notInCombatAlpha = 0.0f;
 	float _weaponAlpha = 0.0f;
