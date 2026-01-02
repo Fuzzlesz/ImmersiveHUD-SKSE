@@ -137,6 +137,8 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_ctxSneakAlpha = 0.0f;
 	_enchantAlphaL = 0.0f;
 	_enchantAlphaR = 0.0f;
+	_combatAlpha = 0.0f;
+	_weaponAlpha = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
 	_displayTimer = 0.0f;
@@ -266,16 +268,24 @@ void HUDManager::Update(float a_delta)
 
 	const bool shouldHide = ShouldHideHUD();
 
+	// Cache immediate responsive states
+	const bool isInCombat = player->IsInCombat();
+	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
+
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
 
 	if (!shouldBeVisible) {
-		if ((settings->IsAlwaysShowInCombat() && player->IsInCombat()) ||
-			(settings->IsAlwaysShowWeaponDrawn() && player->IsWeaponDrawn())) {
+		if ((settings->IsAlwaysShowInCombat() && isInCombat) ||
+			(settings->IsAlwaysShowWeaponDrawn() && isWeaponDrawn)) {
 			shouldBeVisible = true;
 		}
 	}
 	_targetAlpha = shouldBeVisible ? 100.0f : 0.0f;
+
+	// Per-element state targets for fancy linear fading
+	float targetCombat = isInCombat ? 100.0f : 0.0f;
+	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
 
 	// Crosshair Target Alpha
 	float targetCtx = 0.0f;
@@ -295,7 +305,7 @@ void HUDManager::Update(float a_delta)
 	}
 
 	// Enchantment Target Logic
-	const bool weaponsActive = compat->IsPlayerWeaponDrawn();
+	const bool weaponsActive = isWeaponDrawn;
 	const bool leftEnch = compat->HasEnchantedWeapon(true);
 	const bool rightEnch = compat->HasEnchantedWeapon(false);
 
@@ -320,6 +330,8 @@ void HUDManager::Update(float a_delta)
 	// Snap to target instantly when coming out of a menu or loading to match vanilla behaviour
 	if (_wasHidden) {
 		_currentAlpha = _targetAlpha;
+		_combatAlpha = targetCombat;
+		_weaponAlpha = targetWeapon;
 		_ctxAlpha = targetCtx;
 		_enchantAlphaL = targetEnL;
 		_enchantAlphaR = targetEnR;
@@ -333,33 +345,29 @@ void HUDManager::Update(float a_delta)
 		const float fadeSpeed = settings->GetFadeSpeed();
 		const float change = fadeSpeed * (a_delta * 60.0f);
 
-		// Global HUD: Linear Math (Vanilla Feel)
-		if (std::abs(_currentAlpha - _targetAlpha) <= change) {
-			_currentAlpha = _targetAlpha;
-		} else if (_currentAlpha < _targetAlpha) {
-			_currentAlpha += change;
-		} else {
-			_currentAlpha -= change;
-		}
+		// Helper lambda for consistent linear transitions
+		auto UpdateLinear = [&](float& a_currentAlpha, float a_targetAlpha) {
+			if (std::abs(a_currentAlpha - a_targetAlpha) <= change) {
+				a_currentAlpha = a_targetAlpha;
+			} else if (a_currentAlpha < a_targetAlpha) {
+				a_currentAlpha += change;
+			} else {
+				a_currentAlpha -= change;
+			}
+		};
+
+		// Global HUD & Enchantments: Linear Math (Vanilla Feel)
+		UpdateLinear(_currentAlpha, _targetAlpha);
+		UpdateLinear(_combatAlpha, targetCombat);
+		UpdateLinear(_weaponAlpha, targetWeapon);
+		UpdateLinear(_enchantAlphaL, targetEnL);
+		UpdateLinear(_enchantAlphaR, targetEnR);
 
 		// Crosshair: Lerp Math (Smooth Feel)
 		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
 		if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
 			_ctxAlpha = targetCtx;
 		}
-
-		// Enchantment: Linear Math
-		auto UpdateLinear = [&](float& a_current, float a_target) {
-			if (std::abs(a_current - a_target) <= change) {
-				a_current = a_target;
-			} else if (a_current < a_target) {
-				a_current += change;
-			} else {
-				a_current -= change;
-			}
-		};
-		UpdateLinear(_enchantAlphaL, targetEnL);
-		UpdateLinear(_enchantAlphaR, targetEnR);
 
 		_prevDelta = a_delta;
 		_timer += _prevDelta;
@@ -715,12 +723,19 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 {
 	const auto settings = Settings::GetSingleton();
 	const auto compat = Compat::GetSingleton();
+	const auto player = RE::PlayerCharacter::GetSingleton();
 	const bool menuOpen = ShouldHideHUD();
 
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
+	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
+	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
 	const float alphaR = menuOpen ? 0.0f : _enchantAlphaR;
+
+	// Immediate state checks for Visibility Hammer logic
+	const bool isInCombat = player && player->IsInCombat();
+	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
 
 	// One-time check: detect SkyHUD preference before hammer pollution.
 	static bool skyHUDCombinedActive = false;
@@ -814,6 +829,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			if (mode == Settings::kHidden) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
+			} else if (mode == Settings::kInCombat) {
+				targetAlpha = combatAlpha;
+				shouldBeVisible = isInCombat && !menuOpen;
+			} else if (mode == Settings::kWeaponDrawn) {
+				targetAlpha = weaponAlpha;
+				shouldBeVisible = isWeaponDrawn && !menuOpen;
 			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
@@ -841,12 +862,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
-			// Visibility Hammer: forces through ActionScript auto-hiding.
-			if (shouldBeVisible && targetAlpha > 0.1) {
+			// Visibility Hammer: Forces through ActionScript auto-hiding. Base logic on the state (shouldBeVisible) rather than fading alpha.
+			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
 				if (isResourceBar) {
-					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive));
+					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kWeaponDrawn));
 				} else if (isEnchantSkyHUD) {
-					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, managedAlpha, mode, false);
+					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
 				} else if (isEnchantLeft || isEnchantRight) {
 					EnforceEnchantMeterVisible(elem);
 				}
@@ -900,6 +921,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
 			dInfo.SetAlpha(100.0);
+		} else if (mode == Settings::kInCombat) {
+			dInfo.SetVisible(combatAlpha > 0.01);
+			dInfo.SetAlpha(combatAlpha);
+		} else if (mode == Settings::kWeaponDrawn) {
+			dInfo.SetVisible(weaponAlpha > 0.01);
+			dInfo.SetAlpha(weaponAlpha);
 		} else {
 			dInfo.SetVisible(managedAlpha > 0.1f);
 			dInfo.SetAlpha(managedAlpha);
@@ -919,6 +946,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 	const bool menuOpen = ShouldHideHUD();
 	const bool tdmActive = compat->IsTDMActive();
+
+	// Use already calculated fading alphas
+	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
+	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -957,6 +988,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			dInfo.SetAlpha(100.0);
 		} else if (mode == Settings::kHidden) {
 			dInfo.SetAlpha(0.0);
+		} else if (mode == Settings::kInCombat) {
+			dInfo.SetAlpha(combatAlpha);
+		} else if (mode == Settings::kWeaponDrawn) {
+			dInfo.SetAlpha(weaponAlpha);
 		} else {
 			if (menuNameStr == "TrueHUD") {
 				dInfo.SetAlpha(tdmActive ? 100.0 : a_alpha);

@@ -61,7 +61,9 @@ namespace MCMGen
 								  { "options", json::array({ "$fzIH_ModeVisible",
 												   "$fzIH_ModeImmersive",
 												   "$fzIH_ModeHidden",
-												   "$fzIH_ModeIgnored" }) } } }
+												   "$fzIH_ModeIgnored",
+												   "$fzIH_ModeInCombat",
+												   "$fzIH_ModeWeaponDrawn" }) } } }
 		};
 	}
 
