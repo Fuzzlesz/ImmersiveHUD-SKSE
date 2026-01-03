@@ -336,11 +336,15 @@ void HUDManager::Update(float a_delta)
 		if (settings->GetSneakMeterSettings().enabled) {
 			// Contextual Authority: detection level math mixed with global toggle state
 			float detectionAlpha = 0.0f;
-			if (compat->IsSmoothCamActive() || compat->IsTDMActive()) {
-				detectionAlpha = compat->IsDetectionMeterInstalled() ? 0.0f : (_lastDetectionLevel / 2.0f);
+
+			// Unified Logic: Consistent behavior for both 1st and 3rd person.
+			// Target 85% opacity based on detection level.
+			if (compat->IsDetectionMeterInstalled()) {
+				detectionAlpha = 0.0f;
 			} else {
-				detectionAlpha = std::clamp(compat->IsDetectionMeterInstalled() ? 0.0f : _lastDetectionLevel, 0.0f, 100.0f);
+				detectionAlpha = _lastDetectionLevel * 0.85f;
 			}
+
 			targetSneak = std::max(detectionAlpha, _currentAlpha);
 			// ActionScript scaling (Detection modes only).
 			targetSneak = (targetSneak * 0.01f * 90.0f);
