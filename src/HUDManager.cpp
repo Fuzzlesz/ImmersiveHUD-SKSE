@@ -657,6 +657,15 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 	auto hud = ui->GetMenu("HUD Menu");
 	RE::GFxMovieView* hudMovie = (hud && hud->uiMovie) ? hud->uiMovie.get() : nullptr;
 
+	// Detect SkyHUD presence before iterating elements
+	_isSkyHUDActive = false;
+	if (hudMovie) {
+		RE::GFxValue test;
+		if (hudMovie->GetVariable(&test, "_root.HUDMovieBaseInstance.ChargeMeterBaseAlt")) {
+			_isSkyHUDActive = true;
+		}
+	}
+
 	if (hudMovie) {
 		for (const auto& def : HUDElements::Get()) {
 			for (const auto& path : def.paths) {
@@ -768,19 +777,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const bool isLockedOn = compat->IsTDMActive();
 	const bool isSneaking = player && player->IsSneaking();
 
-	// One-time check: detect SkyHUD preference before hammer pollution.
-	static bool skyHUDCombinedActive = false;
-	static bool hasDetectedSkyHUD = false;
-	if (!hasDetectedSkyHUD) {
-		RE::GFxValue skyHUDContainer;
-		if (a_movie->GetVariable(&skyHUDContainer, "_root.HUDMovieBaseInstance.ChargeMeterBaseAlt")) {
-			RE::GFxValue::DisplayInfo cInfo;
-			skyHUDContainer.GetDisplayInfo(&cInfo);
-			skyHUDCombinedActive = cInfo.GetVisible();
-			hasDetectedSkyHUD = true;
-		}
-	}
-
 	// Local set to track paths processed in this frame and prevent growth leaks
 	std::unordered_set<std::string> processedPaths;
 
@@ -808,7 +804,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			elem.GetDisplayInfo(&dInfo);
 
 			// Mutual Exclusion: SkyHUD Combined mode vs Vanilla Left/Right
-			if ((skyHUDCombinedActive && (isEnchantLeft || isEnchantRight)) || (!skyHUDCombinedActive && isEnchantSkyHUD)) {
+			if ((_isSkyHUDActive && (isEnchantLeft || isEnchantRight)) || (!_isSkyHUDActive && isEnchantSkyHUD)) {
 				dInfo.SetVisible(false);
 				dInfo.SetAlpha(0.0);
 				elem.SetDisplayInfo(dInfo);

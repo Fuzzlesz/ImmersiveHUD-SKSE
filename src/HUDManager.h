@@ -23,6 +23,9 @@ public:
 	// Visibility State Helpers
 	bool ShouldHideHUD();
 
+	// Status Getters
+	[[nodiscard]] bool IsSkyHUDActive() const { return _isSkyHUDActive; }
+
 private:
 	// Alpha Application Logic
 	void ApplyAlphaToHUD(float a_globalAlpha);
@@ -56,6 +59,7 @@ private:
 	bool _hasScanned = false;
 	bool _wasHidden = false;
 	std::atomic_bool _isScanPending = false;
+	bool _isSkyHUDActive = false;
 
 	// Alpha Transition Values
 	float _currentAlpha = 0.0f;

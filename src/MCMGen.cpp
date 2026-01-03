@@ -1,5 +1,7 @@
-#include "MCMGen.h"
+#include "Compat.h"
 #include "HUDElements.h"
+#include "HUDManager.h"
+#include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
 
@@ -49,8 +51,30 @@ namespace MCMGen
 		return false;
 	}
 
-json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
+	json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
 	{
+		std::vector<std::string> optionsList = {
+			"$fzIH_ModeVisible",
+			"$fzIH_ModeImmersive",
+			"$fzIH_ModeHidden",
+			"$fzIH_ModeIgnored",
+			"$fzIH_ModeInterior",
+			"$fzIH_ModeExterior",
+			"$fzIH_ModeInCombat",
+			"$fzIH_ModeNotInCombat",
+			"$fzIH_ModeWeaponDrawn"
+		};
+
+		// Safely add Locked On placeholder if TDM is not installed.
+		// LockedOn MUST be the last item to preserve index safety for previous items.
+		if (Compat::GetSingleton()->g_TDM) {
+			optionsList.push_back("$fzIH_ModeLockedOn");
+		} else {
+			optionsList.push_back("$fzIH_ModeTDMDisabled");
+		}
+
+		//Note to self: Further options get added here, after TDM, so we maintain positioning.
+
 		return {
 			{ "text", a_text },
 			{ "type", "enum" },
@@ -58,16 +82,7 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 			{ "id", a_id },
 			{ "valueOptions", { { "sourceType", "ModSettingInt" },
 								  { "defaultValue", 1 },
-								  { "options", json::array({ "$fzIH_ModeVisible",
-												   "$fzIH_ModeImmersive",
-												   "$fzIH_ModeHidden",
-												   "$fzIH_ModeIgnored",
-												   "$fzIH_ModeInterior",
-												   "$fzIH_ModeExterior",
-												   "$fzIH_ModeInCombat",
-												   "$fzIH_ModeNotInCombat",
-												   "$fzIH_ModeWeaponDrawn",
-												   "$fzIH_ModeLockedOn" }) } } }
+								  { "options", optionsList } } }
 		};
 	}
 
@@ -154,7 +169,6 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 							std::string sourceStr = "Unknown";
 							std::string rawID = "";
 
-
 							// Parse "Source: [URL]"
 							size_t srcPos = help.find("Source: ");
 							if (srcPos != std::string::npos) {
@@ -196,7 +210,15 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 			std::vector<ElementSortEntry> validElements;
 			std::unordered_set<std::string> processedPaths;
 
+			// Check for SkyHUD presence to conditionally filter the combined meter
+			bool isSkyHUD = HUDManager::GetSingleton()->IsSkyHUDActive();
+
 			for (const auto& def : HUDElements::Get()) {
+				// Conditional Filter: Skip SkyHUD Combined meter if SkyHUD not active
+				if (strcmp(def.id, "iMode_EnchantCombined") == 0 && !isSkyHUD) {
+					continue;
+				}
+
 				std::string iniKey = def.id;
 				std::string mcmID = iniKey + ":HUDElements";
 				std::string label = def.label;
