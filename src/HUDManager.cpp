@@ -316,8 +316,8 @@ void HUDManager::Update(float a_delta)
 		// Contextual: Interaction state (valid pick target)
 		bool isLookActive = compat->IsCrosshairTargetValid() && !isBTPS;
 
-		// Visibility Authority: Merge contextual states with global settings
-		bool shouldDrawCrosshair = (isActionActive || isLookActive || (_targetAlpha > 0.1f));
+		// Visibility Authority: Merge contextual states.
+		bool shouldDrawCrosshair = (isActionActive || isLookActive);
 
 		// SmoothCam API: Request control (block) to hide, release (unblock) to draw
 		if (isSmoothCam && !shouldHide) {
@@ -341,6 +341,7 @@ void HUDManager::Update(float a_delta)
 			targetCtx = 0.0f;
 		}
 	} else {
+		// If Contextual Crosshair is disabled in settings, link it to the global toggle
 		targetCtx = _targetAlpha;
 	}
 
