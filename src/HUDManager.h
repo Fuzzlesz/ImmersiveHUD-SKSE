@@ -18,7 +18,7 @@ public:
 
 	// Core Logic Loop
 	void Update(float a_delta);
-	void UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_sneakAnim);
+	void UpdateDetectionLevel(float a_level);
 
 	// Visibility State Helpers
 	bool ShouldHideHUD();
@@ -76,7 +76,6 @@ private:
 	float _scanTimer = 0.0f;
 	float _displayTimer = 0.0f;
 
-	// Stealth State Cache
-	RE::GFxValue _cachedSneakAnim;
-	bool _hasCachedSneakAnim = false;
+	// Stealth State Tracker
+	float _lastDetectionLevel = 0.0f;
 };

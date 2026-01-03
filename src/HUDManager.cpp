@@ -89,7 +89,8 @@ struct StealthMeterHook
 	static char thunk(RE::StealthMeter* a_this, int64_t a2, int64_t a3, int64_t a4)
 	{
 		auto result = func(a_this, a2, a3, a4);
-		HUDManager::GetSingleton()->UpdateContextualStealth(static_cast<float>(a_this->unk88), a_this->sneakAnim);
+		// Minimal task: store the detection level for the main update loop to poll
+		HUDManager::GetSingleton()->UpdateDetectionLevel(static_cast<float>(a_this->unk88));
 		return result;
 	}
 	static inline REL::Relocation<decltype(thunk)> func;
@@ -145,6 +146,7 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
 	_displayTimer = 0.0f;
+	_lastDetectionLevel = 0.0f;
 
 	// Call Update with 0 delta to calculate state and snap UI immediately.
 	// This eliminates delay/flicker when coming out of load screens or menus.
@@ -221,6 +223,11 @@ void HUDManager::OnButtonUp()
 	}
 }
 
+void HUDManager::UpdateDetectionLevel(float a_level)
+{
+	_lastDetectionLevel = a_level;
+}
+
 // ==========================================
 // Update Loop
 // ==========================================
@@ -275,6 +282,7 @@ void HUDManager::Update(float a_delta)
 	const bool isInterior = player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
 	const bool isInCombat = player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
+	const bool isSneaking = player->IsSneaking();
 
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
@@ -308,6 +316,60 @@ void HUDManager::Update(float a_delta)
 		}
 	} else {
 		targetCtx = _targetAlpha;
+	}
+
+	// Sneak Meter Target Alpha
+	float targetSneak = 0.0f;
+	float sneakFadeSpeed = settings->GetFadeSpeed();
+	if (isSneaking && compat->IsSneakAllowed()) {
+		if (settings->GetSneakMeterSettings().enabled) {
+			// Contextual Authority: detection level math mixed with global toggle state
+			float detectionAlpha = 0.0f;
+			if (compat->IsSmoothCamActive() || compat->IsTDMActive()) {
+				detectionAlpha = compat->IsDetectionMeterInstalled() ? 0.0f : (_lastDetectionLevel / 2.0f);
+			} else {
+				detectionAlpha = std::clamp(compat->IsDetectionMeterInstalled() ? 0.0f : _lastDetectionLevel, 0.0f, 100.0f);
+			}
+			targetSneak = std::max(detectionAlpha, _currentAlpha);
+			// ActionScript scaling (Detection modes only).
+			targetSneak = (targetSneak * 0.01f * 90.0f);
+		} else {
+			// Manual Authority: follow linear state synchronization trackers
+			int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
+			switch (widgetMode) {
+			case Settings::kVisible:
+				targetSneak = 100.0f;
+				break;
+			case Settings::kInterior:
+				targetSneak = targetInterior;
+				break;
+			case Settings::kExterior:
+				targetSneak = targetExterior;
+				break;
+			case Settings::kInCombat:
+				targetSneak = targetCombat;
+				break;
+			case Settings::kNotInCombat:
+				targetSneak = targetNotInCombat;
+				break;
+			case Settings::kWeaponDrawn:
+				targetSneak = targetWeapon;
+				break;
+			case Settings::kHidden:
+				targetSneak = 0.0f;
+				break;
+			case Settings::kIgnored:
+				targetSneak = 100.0f;
+				break;
+			default:
+				targetSneak = _currentAlpha;
+				break;  // kImmersive
+			}
+		}
+	} else {
+		// Player stood up or globally disabled: target hard 0
+		targetSneak = 0.0f;
+		sneakFadeSpeed = 16.0f;  // Fast-fade exit
 	}
 
 	// Enchantment Target Logic
@@ -344,6 +406,7 @@ void HUDManager::Update(float a_delta)
 		_notInCombatAlpha = targetNotInCombat;
 		_weaponAlpha = targetWeapon;
 		_ctxAlpha = targetCtx;
+		_ctxSneakAlpha = targetSneak;
 		_wasHidden = false;
 	}
 
@@ -381,6 +444,16 @@ void HUDManager::Update(float a_delta)
 			_ctxAlpha = targetCtx;
 		}
 
+		// Stealth Meter: Mixed Math depending on mode
+		if (settings->GetSneakMeterSettings().enabled || !isSneaking) {
+			_ctxSneakAlpha = std::lerp(_ctxSneakAlpha, targetSneak, a_delta * sneakFadeSpeed);
+			if (std::abs(_ctxSneakAlpha - targetSneak) < 0.1f) {
+				_ctxSneakAlpha = targetSneak;
+			}
+		} else {
+			UpdateLinear(_ctxSneakAlpha, targetSneak);
+		}
+
 		_prevDelta = a_delta;
 		_timer += _prevDelta;
 	}
@@ -388,94 +461,6 @@ void HUDManager::Update(float a_delta)
 	SKSE::GetTaskInterface()->AddUITask([this, alpha = _currentAlpha]() {
 		ApplyAlphaToHUD(alpha);
 	});
-}
-
-void HUDManager::UpdateContextualStealth(float a_detectionLevel, RE::GFxValue a_sneakAnim)
-{
-	_cachedSneakAnim = a_sneakAnim;
-	_hasCachedSneakAnim = true;
-
-	const auto settings = Settings::GetSingleton();
-	const auto player = RE::PlayerCharacter::GetSingleton();
-	const auto compat = Compat::GetSingleton();
-	if (!player) {
-		return;
-	}
-
-	const int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
-	const bool menuOpen = ShouldHideHUD();
-
-	if (widgetMode == Settings::kIgnored) {
-		return;
-	}
-
-	// Force hidden if HUD should be hidden, mode is Hidden, or global in esp is set
-	if (menuOpen || widgetMode == Settings::kHidden || !compat->IsSneakAllowed()) {
-		RE::GFxValue::DisplayInfo d;
-		a_sneakAnim.GetDisplayInfo(&d);
-		if (d.GetAlpha() > 0.0f || d.GetVisible()) {
-			d.SetVisible(false);
-			d.SetAlpha(0.0f);
-			a_sneakAnim.SetDisplayInfo(d);
-		}
-		return;
-	}
-
-	const bool smoothCam = compat->IsSmoothCamActive();
-	const bool tdm = compat->IsTDMActive();
-	const bool detectionMeter = compat->IsDetectionMeterInstalled();
-
-	float targetAlpha = 0.0f;
-
-	if (player->IsSneaking()) {
-		if (widgetMode == Settings::kVisible) {
-			targetAlpha = 100.0f;
-		} else if (widgetMode == Settings::kImmersive) {
-			if (settings->GetSneakMeterSettings().enabled) {
-				if (_userWantsVisible) {
-					targetAlpha = 100.0f;
-				} else {
-					if (smoothCam || tdm) {
-						targetAlpha = detectionMeter ? 0.0f : (a_detectionLevel / 2.0f);
-					} else {
-						targetAlpha = std::clamp(detectionMeter ? 0.0f : a_detectionLevel, 0.0f, 100.0f);
-					}
-				}
-				targetAlpha = (targetAlpha * 0.01f * 90.0f);
-			} else {
-				targetAlpha = _currentAlpha;
-			}
-		}
-	}
-
-	// Snap transition if we just resumed from a menu
-	if (_wasHidden) {
-		_ctxSneakAlpha = targetAlpha;
-	}
-
-	// Stealth Meter: Lerp Math (Smooth Feel)
-	_ctxSneakAlpha = std::lerp(_ctxSneakAlpha, targetAlpha, _prevDelta * settings->GetFadeSpeed());
-	if (std::abs(_ctxSneakAlpha - targetAlpha) < 0.1f) {
-		_ctxSneakAlpha = targetAlpha;
-	}
-
-	// Pulse logic
-	float finalAlpha = _ctxSneakAlpha;
-	if (widgetMode == Settings::kImmersive && settings->GetSneakMeterSettings().enabled && !_userWantsVisible && finalAlpha > 0.01f) {
-		constexpr float kPulseRange = 0.05f;
-		constexpr float kPulseFreq = 0.05f;
-		auto detectionFreq = (a_detectionLevel / 200.0f) + 0.5f;
-		auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
-		finalAlpha *= std::min(pulse, 1.0f);
-	}
-
-	if (std::abs(finalAlpha - _ctxSneakAlpha) > 0.01f || _wasHidden) {
-		RE::GFxValue::DisplayInfo displayInfo;
-		a_sneakAnim.GetDisplayInfo(std::addressof(displayInfo));
-		displayInfo.SetAlpha(static_cast<float>(finalAlpha));
-		displayInfo.SetVisible(finalAlpha > 0.1f);
-		a_sneakAnim.SetDisplayInfo(displayInfo);
-	}
 }
 
 // ==========================================
@@ -750,6 +735,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const bool isInterior = player && player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
 	const bool isInCombat = player && player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
+	const bool isSneaking = player && player->IsSneaking();
 
 	// One-time check: detect SkyHUD preference before hammer pollution.
 	static bool skyHUDCombinedActive = false;
@@ -768,13 +754,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	std::unordered_set<std::string> processedPaths;
 
 	for (const auto& def : HUDElements::Get()) {
-		if (strcmp(def.id, "iMode_StealthMeter") == 0) {
-			for (const auto& path : def.paths) {
-				processedPaths.insert(path);
-			}
-			continue;
-		}
-
+		bool isStealthMeter = (strcmp(def.id, "iMode_StealthMeter") == 0);
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
@@ -810,7 +790,71 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				continue;
 			}
 
-			// kIgnored block: simulates vanilla hide-when-full while fixing the reappear bug.
+			// Stealth Meter Handling (Unified Logic)
+			if (isStealthMeter) {
+				if (mode == Settings::kIgnored) {
+					// Manual Vanilla Authority
+					float finalAlpha = _ctxSneakAlpha;
+
+					// Apply Pulse logic (Ensures vanilla mode still breathes when detected)
+					if (isSneaking && _lastDetectionLevel > 0.1f && finalAlpha > 0.01f) {
+						constexpr float kPulseRange = 0.05f;
+						constexpr float kPulseFreq = 0.05f;
+						auto detectionFreq = (_lastDetectionLevel / 200.0f) + 0.5f;
+						auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
+						finalAlpha *= std::min(static_cast<float>(pulse), 1.0f);
+					}
+
+					bool finalVisible = (finalAlpha > 0.1f) && !menuOpen;
+					dInfo.SetVisible(finalVisible);
+					dInfo.SetAlpha(finalAlpha);
+					elem.SetDisplayInfo(dInfo);
+
+					// Sync sub-clips
+					const char* subPaths[] = { "SneakAnimInstance", "SneakTextHolder" };
+					for (auto p : subPaths) {
+						RE::GFxValue sub;
+						if (elem.GetMember(p, &sub) && sub.IsDisplayObject()) {
+							RE::GFxValue::DisplayInfo sd;
+							sd.SetVisible(finalVisible);
+							sd.SetAlpha(finalAlpha);
+							sub.SetDisplayInfo(sd);
+						}
+					}
+					continue;
+				}
+
+				// Managed/Contextual Authority
+				float finalAlpha = _ctxSneakAlpha;
+				if (settings->GetSneakMeterSettings().enabled && isSneaking && _lastDetectionLevel > 0.1f && finalAlpha > 0.01f) {
+					constexpr float kPulseRange = 0.05f;
+					constexpr float kPulseFreq = 0.05f;
+					auto detectionFreq = (_lastDetectionLevel / 200.0f) + 0.5f;
+					auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
+					finalAlpha *= std::min(static_cast<float>(pulse), 1.0f);
+				}
+
+				double targetAlpha = finalAlpha;
+				bool shouldBeVisible = (targetAlpha > 0.1f) && !menuOpen;
+				dInfo.SetVisible(shouldBeVisible);
+				dInfo.SetAlpha(targetAlpha);
+				elem.SetDisplayInfo(dInfo);
+
+				// Clip Injection: override eye/text clips
+				const char* subPaths[] = { "SneakAnimInstance", "SneakTextHolder" };
+				for (auto p : subPaths) {
+					RE::GFxValue sub;
+					if (elem.GetMember(p, &sub) && sub.IsDisplayObject()) {
+						RE::GFxValue::DisplayInfo sd;
+						sd.SetVisible(shouldBeVisible);
+						sd.SetAlpha(targetAlpha);
+						sub.SetDisplayInfo(sd);
+					}
+				}
+				continue;
+			}
+
+			// Enchantment kIgnored block
 			if (mode == Settings::kIgnored && isEnchantElement) {
 				float target = CalculateEnchantmentIgnoredAlpha(isEnchantLeft, isEnchantSkyHUD, menuOpen, alphaL, alphaR);
 				if (isEnchantSkyHUD) {
@@ -825,7 +869,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				continue;
 			}
 
-			// Handle reset for ignored elements.
+			// Handle reset for other ignored elements
 			if (mode == Settings::kIgnored) {
 				if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
 					dInfo.SetVisible(true);
@@ -873,8 +917,17 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					targetAlpha = ctxBased;
 					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
-					shouldBeVisible = (managedAlpha > 0.01f);
-					targetAlpha = managedAlpha;
+					// Check master toggle and transient state triggers
+					bool shouldShow = _userWantsVisible;
+					if (!shouldShow) {
+						if ((settings->IsAlwaysShowInCombat() && isInCombat) ||
+							(settings->IsAlwaysShowWeaponDrawn() && isWeaponDrawn)) {
+							shouldShow = true;
+						}
+					}
+					// Synchronize with global HUD fade and menu safety
+					shouldBeVisible = shouldShow && !menuOpen;
+					targetAlpha = shouldShow ? managedAlpha : 0.0;
 				}
 			}
 
@@ -882,10 +935,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
-			// Visibility Hammer: Forces through ActionScript auto-hiding. Base logic on the state (shouldBeVisible) rather than fading alpha.
+			// Visibility Hammer logic: Override engine hiding
 			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
 				if (isResourceBar) {
-					EnforceHMSMeterVisible(elem, (mode == Settings::kVisible || mode == Settings::kImmersive || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn || mode == Settings::kInterior || mode == Settings::kExterior));
+					// Pass true if the mode is Immersive/Visible to override "hide when full"
+					bool forceOverride = (mode == Settings::kImmersive || mode == Settings::kVisible || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn || mode == Settings::kInterior || mode == Settings::kExterior);
+					EnforceHMSMeterVisible(elem, forceOverride);
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
 				} else if (isEnchantLeft || isEnchantRight) {
@@ -897,6 +952,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	const auto& pathSet = settings->GetSubWidgetPaths();
 	for (const auto& path : pathSet) {
+		// Generic HUD check: prevents dynamic scan from stomping on processed vanilla elements
 		if (processedPaths.contains(path) ||
 			path == "_root.HUDMovieBaseInstance.StealthMeterInstance") {
 			continue;
@@ -913,27 +969,23 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			continue;
 		}
 
-		// Handle reset for ignored widgets.
-		if (mode == Settings::kIgnored) {
-			RE::GFxValue elem;
-			if (a_movie->GetVariable(&elem, path.c_str()) && elem.IsDisplayObject()) {
-				RE::GFxValue::DisplayInfo dInfo;
-				elem.GetDisplayInfo(&dInfo);
-				if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
-					dInfo.SetVisible(true);
-					dInfo.SetAlpha(100.0);
-					elem.SetDisplayInfo(dInfo);
-				}
-			}
-			continue;
-		}
-
 		RE::GFxValue elem;
 		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
 			continue;
 		}
-
 		RE::GFxValue::DisplayInfo dInfo;
+		elem.GetDisplayInfo(&dInfo);
+
+		// Handle reset for ignored widgets.
+		if (mode == Settings::kIgnored) {
+			if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
+				dInfo.SetVisible(true);
+				dInfo.SetAlpha(100.0);
+				elem.SetDisplayInfo(dInfo);
+			}
+			continue;
+		}
+
 		if (mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
 			dInfo.SetAlpha(0.0);
