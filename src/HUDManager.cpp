@@ -775,15 +775,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			RE::GFxValue::DisplayInfo dInfo;
 			elem.GetDisplayInfo(&dInfo);
 
-			// Mutual Exclusion
-			if (skyHUDCombinedActive) {
-				if (isEnchantLeft || isEnchantRight) {
-					dInfo.SetVisible(false);
-					dInfo.SetAlpha(0.0);
-					elem.SetDisplayInfo(dInfo);
-					continue;
-				}
-			} else if (isEnchantSkyHUD) {
+			// Mutual Exclusion: SkyHUD Combined mode vs Vanilla Left/Right
+			if ((skyHUDCombinedActive && (isEnchantLeft || isEnchantRight)) || (!skyHUDCombinedActive && isEnchantSkyHUD)) {
 				dInfo.SetVisible(false);
 				dInfo.SetAlpha(0.0);
 				elem.SetDisplayInfo(dInfo);
