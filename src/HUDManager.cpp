@@ -785,6 +785,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	std::unordered_set<std::string> processedPaths;
 
 	for (const auto& def : HUDElements::Get()) {
+		bool isCompass = (strcmp(def.id, "iMode_Compass") == 0);
 		bool isStealthMeter = (strcmp(def.id, "iMode_StealthMeter") == 0);
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
@@ -808,6 +809,14 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			// Mutual Exclusion: SkyHUD Combined mode vs Vanilla Left/Right
 			if ((skyHUDCombinedActive && (isEnchantLeft || isEnchantRight)) || (!skyHUDCombinedActive && isEnchantSkyHUD)) {
+				dInfo.SetVisible(false);
+				dInfo.SetAlpha(0.0);
+				elem.SetDisplayInfo(dInfo);
+				continue;
+			}
+
+			// TESGlobal in esp ensures compass is always hidden if set.
+			if (isCompass && !compat->IsCompassAllowed()) {
 				dInfo.SetVisible(false);
 				dInfo.SetAlpha(0.0);
 				elem.SetDisplayInfo(dInfo);
@@ -926,9 +935,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else if (mode == Settings::kLockedOn) {
 				targetAlpha = lockedOnAlpha;
 				shouldBeVisible = isLockedOn && !menuOpen;
-			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
-				shouldBeVisible = false;
-				targetAlpha = 0.0;
 			} else if (isEnchantElement) {
 				targetAlpha = CalculateEnchantmentTargetAlpha(isEnchantLeft, isEnchantSkyHUD, mode, alphaL, alphaR, managedAlpha);
 				shouldBeVisible = (targetAlpha > 0.01);
