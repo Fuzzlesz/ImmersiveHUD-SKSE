@@ -69,6 +69,7 @@ private:
 	float _combatAlpha = 0.0f;
 	float _notInCombatAlpha = 0.0f;
 	float _weaponAlpha = 0.0f;
+	float _lockedOnAlpha = 0.0f;
 
 	// Delta and Timer Tracking
 	float _prevDelta = 0.0f;

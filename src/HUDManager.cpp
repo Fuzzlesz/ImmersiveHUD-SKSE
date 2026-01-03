@@ -143,6 +143,7 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_combatAlpha = 0.0f;
 	_notInCombatAlpha = 0.0f;
 	_weaponAlpha = 0.0f;
+	_lockedOnAlpha = 0.0f;
 	_timer = 0.0f;
 	_scanTimer = 0.0f;
 	_displayTimer = 0.0f;
@@ -283,6 +284,8 @@ void HUDManager::Update(float a_delta)
 	const bool isInCombat = player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
 	const bool isSneaking = player->IsSneaking();
+	const bool isLockedOn = compat->IsTDMActive();
+	const bool isSmoothCam = compat->IsSmoothCamActive();
 
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
@@ -300,18 +303,26 @@ void HUDManager::Update(float a_delta)
 	float targetCombat = isInCombat ? 100.0f : 0.0f;
 	float targetNotInCombat = !isInCombat ? 100.0f : 0.0f;
 	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
+	float targetLockedOn = isLockedOn ? 100.0f : 0.0f;
 
 	// Crosshair Target Alpha
 	float targetCtx = 0.0f;
 	if (settings->GetCrosshairSettings().enabled) {
-		if (compat->IsTDMActive()) {
-			targetCtx = 0.0f;
+		bool isActing = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
+
+		// Only consider looking at a target if BTPS isn't currently showing its 3D selection widget
+		bool isLooking = compat->IsCrosshairTargetValid() && !compat->IsBTPSActive();
+
+		if (isSmoothCam) {
+			// If SmoothCam is active, we only show vanilla crosshair at 100 when looking at something.
+			targetCtx = isLooking ? 100.0f : 0.0f;
 		} else {
-			bool actionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
-			if (actionActive || compat->IsSmoothCamActive()) {
+			if (isActing) {
 				targetCtx = 100.0f;
-			} else if (compat->IsCrosshairTargetValid() && !compat->IsBTPSActive()) {
+			} else if (isLooking) {
 				targetCtx = 50.0f;
+			} else {
+				targetCtx = 0.0f;
 			}
 		}
 	} else {
@@ -405,6 +416,7 @@ void HUDManager::Update(float a_delta)
 		_combatAlpha = targetCombat;
 		_notInCombatAlpha = targetNotInCombat;
 		_weaponAlpha = targetWeapon;
+		_lockedOnAlpha = targetLockedOn;
 		_ctxAlpha = targetCtx;
 		_ctxSneakAlpha = targetSneak;
 		_wasHidden = false;
@@ -428,7 +440,7 @@ void HUDManager::Update(float a_delta)
 			}
 		};
 
-		// Global HUD & Enchantments: Linear Math (Vanilla Feel)
+		// Global HUD & State Conditions: Linear Math (Vanilla Feel)
 		UpdateLinear(_currentAlpha, _targetAlpha);
 		UpdateLinear(_enchantAlphaL, targetEnL);
 		UpdateLinear(_enchantAlphaR, targetEnR);
@@ -437,6 +449,7 @@ void HUDManager::Update(float a_delta)
 		UpdateLinear(_combatAlpha, targetCombat);
 		UpdateLinear(_notInCombatAlpha, targetNotInCombat);
 		UpdateLinear(_weaponAlpha, targetWeapon);
+		UpdateLinear(_lockedOnAlpha, targetLockedOn);
 
 		// Crosshair: Lerp Math (Smooth Feel)
 		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
@@ -730,11 +743,13 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
 	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
+	const float lockedOnAlpha = menuOpen ? 0.0f : _lockedOnAlpha;
 
 	// Immediate state checks for Visibility Hammer logic
 	const bool isInterior = player && player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
 	const bool isInCombat = player && player->IsInCombat();
 	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
+	const bool isLockedOn = compat->IsTDMActive();
 	const bool isSneaking = player && player->IsSneaking();
 
 	// One-time check: detect SkyHUD preference before hammer pollution.
@@ -892,6 +907,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else if (mode == Settings::kWeaponDrawn) {
 				targetAlpha = weaponAlpha;
 				shouldBeVisible = isWeaponDrawn && !menuOpen;
+			} else if (mode == Settings::kLockedOn) {
+				targetAlpha = lockedOnAlpha;
+				shouldBeVisible = isLockedOn && !menuOpen;
 			} else if (strcmp(def.id, "iMode_Compass") == 0 && !compat->IsCompassAllowed()) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
@@ -932,7 +950,10 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
 				if (isResourceBar) {
 					// Pass true if the mode is Immersive/Visible to override "hide when full"
-					bool forceOverride = (mode == Settings::kImmersive || mode == Settings::kVisible || mode == Settings::kInCombat || mode == Settings::kNotInCombat || mode == Settings::kWeaponDrawn || mode == Settings::kInterior || mode == Settings::kExterior);
+					bool forceOverride = (mode == Settings::kVisible || mode == Settings::kImmersive ||
+										  mode == Settings::kInterior || mode == Settings::kExterior ||
+										  mode == Settings::kInCombat || mode == Settings::kNotInCombat ||
+										  mode == Settings::kWeaponDrawn || mode == Settings::kLockedOn);
 					EnforceHMSMeterVisible(elem, forceOverride);
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
@@ -1000,6 +1021,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		} else if (mode == Settings::kWeaponDrawn) {
 			dInfo.SetVisible(weaponAlpha > 0.01);
 			dInfo.SetAlpha(weaponAlpha);
+		} else if (mode == Settings::kLockedOn) {
+			dInfo.SetVisible(lockedOnAlpha > 0.01);
+			dInfo.SetAlpha(lockedOnAlpha);
 		} else {
 			dInfo.SetVisible(managedAlpha > 0.1f);
 			dInfo.SetAlpha(managedAlpha);
@@ -1012,13 +1036,11 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 {
 	const auto ui = RE::UI::GetSingleton();
 	const auto settings = Settings::GetSingleton();
-	const auto compat = Compat::GetSingleton();
 	if (!ui) {
 		return;
 	}
 
 	const bool menuOpen = ShouldHideHUD();
-	const bool tdmActive = compat->IsTDMActive();
 
 	// Use already calculated fading alphas
 	const float interiorAlpha = menuOpen ? 0.0f : _interiorAlpha;
@@ -1026,6 +1048,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	const float combatAlpha = menuOpen ? 0.0f : _combatAlpha;
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
+	const float lockedOnAlpha = menuOpen ? 0.0f : _lockedOnAlpha;
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -1068,12 +1091,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			dInfo.SetAlpha(notInCombatAlpha);
 		} else if (mode == Settings::kWeaponDrawn) {
 			dInfo.SetAlpha(weaponAlpha);
+		} else if (mode == Settings::kLockedOn) {
+			dInfo.SetAlpha(lockedOnAlpha);
 		} else {
-			if (menuNameStr == "TrueHUD") {
-				dInfo.SetAlpha(tdmActive ? 100.0 : a_alpha);
-			} else {
-				dInfo.SetAlpha(a_alpha);
-			}
+			dInfo.SetAlpha(a_alpha);
 		}
 		root.SetDisplayInfo(dInfo);
 	}

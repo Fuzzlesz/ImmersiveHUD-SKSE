@@ -13,7 +13,8 @@ public:
 		kExterior = 5,
 		kInCombat = 6,
 		kNotInCombat = 7,
-		kWeaponDrawn = 8
+		kWeaponDrawn = 8,
+		kLockedOn = 9
 	};
 
 	struct CrosshairSettings

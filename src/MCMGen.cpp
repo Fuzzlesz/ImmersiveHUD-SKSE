@@ -66,7 +66,8 @@ json CreateEnum(const std::string& a_text, const std::string& a_id, const std::s
 												   "$fzIH_ModeExterior",
 												   "$fzIH_ModeInCombat",
 												   "$fzIH_ModeNotInCombat",
-												   "$fzIH_ModeWeaponDrawn" }) } } }
+												   "$fzIH_ModeWeaponDrawn",
+												   "$fzIH_ModeLockedOn" }) } } }
 		};
 	}
 
