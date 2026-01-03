@@ -286,6 +286,8 @@ void HUDManager::Update(float a_delta)
 	const bool isSneaking = player->IsSneaking();
 	const bool isLockedOn = compat->IsTDMActive();
 	const bool isSmoothCam = compat->IsSmoothCamActive();
+	const bool isTDM = compat->IsTDMActive();
+	const bool isBTPS = compat->IsBTPSActive();
 
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
@@ -308,22 +310,35 @@ void HUDManager::Update(float a_delta)
 	// Crosshair Target Alpha
 	float targetCtx = 0.0f;
 	if (settings->GetCrosshairSettings().enabled) {
-		bool isActing = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
+		// Contextual: Active combat state (Ranged / Magic)
+		bool isActionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
 
-		// Only consider looking at a target if BTPS isn't currently showing its 3D selection widget
-		bool isLooking = compat->IsCrosshairTargetValid() && !compat->IsBTPSActive();
+		// Contextual: Interaction state (valid pick target)
+		bool isLookActive = compat->IsCrosshairTargetValid() && !isBTPS;
 
-		if (isSmoothCam) {
-			// If SmoothCam is active, we only show vanilla crosshair at 100 when looking at something.
-			targetCtx = isLooking ? 100.0f : 0.0f;
-		} else {
-			if (isActing) {
-				targetCtx = 100.0f;
-			} else if (isLooking) {
-				targetCtx = 50.0f;
-			} else {
+		// Visibility Authority: Merge contextual states with global settings
+		bool shouldDrawCrosshair = (isActionActive || isLookActive || (_targetAlpha > 0.1f));
+
+		// SmoothCam API: Request control (block) to hide, release (unblock) to draw
+		if (isSmoothCam && !shouldHide) {
+			compat->ManageSmoothCamControl(!shouldDrawCrosshair);
+		}
+
+		// Alpha Calculation
+		if (shouldDrawCrosshair) {
+			if (isTDM) {
+				// TDM handles rendering; vanilla is suppressed
 				targetCtx = 0.0f;
+			} else {
+				// Target 100% for active use/SmoothCam, 50% for passive interaction
+				if (isActionActive || isSmoothCam) {
+					targetCtx = 100.0f;
+				} else {
+					targetCtx = 50.0f;
+				}
 			}
+		} else {
+			targetCtx = 0.0f;
 		}
 	} else {
 		targetCtx = _targetAlpha;
@@ -337,8 +352,7 @@ void HUDManager::Update(float a_delta)
 			// Contextual Authority: detection level math mixed with global toggle state
 			float detectionAlpha = 0.0f;
 
-			// Unified Logic: Consistent behavior for both 1st and 3rd person.
-			// Target 85% opacity based on detection level.
+			// Contextual: Target 85% opacity based on detection level (Unified 1st/3rd person)
 			if (compat->IsDetectionMeterInstalled()) {
 				detectionAlpha = 0.0f;
 			} else {
@@ -425,8 +439,6 @@ void HUDManager::Update(float a_delta)
 		_ctxSneakAlpha = targetSneak;
 		_wasHidden = false;
 	}
-
-	compat->ManageSmoothCamControl(false);
 
 	// 3. Mixed Math Calculations (Skip if a_delta is 0)
 	if (a_delta > 0.0f) {
