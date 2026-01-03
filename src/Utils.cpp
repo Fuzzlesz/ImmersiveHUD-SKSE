@@ -4,10 +4,11 @@
 namespace Utils
 {
 	// Blocklist to help against recursion and snagging junk/crashing.
+	// NOTE: Removed "HUDMovieBaseInstance" from here so the Debug Dump can see it.
+	// It is now manually blocked in ContainerDiscoveryVisitor instead.
 	static const std::unordered_set<std::string> kDiscoveryBlockList = {
 		"markerData",
 		"widgetLoaderContainer",
-		"HUDMovieBaseInstance",
 		"aCompassMarkerList",
 		"HUDHooksContainer"
 	};
@@ -254,7 +255,15 @@ namespace Utils
 		}
 		std::string name(a_name);
 
+		// Use the general blocklist
 		if (kDiscoveryBlockList.contains(name)) {
+			return;
+		}
+
+		// Explicitly block the main HUD instance from discovery to avoid duplicating
+		// vanilla elements that are already handled by HUDElements::Get().
+		// We handle this here specifically so the DebugVisitor (Dump Button) can still see it.
+		if (name == "HUDMovieBaseInstance") {
 			return;
 		}
 
