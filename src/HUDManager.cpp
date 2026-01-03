@@ -50,9 +50,9 @@ namespace
 						d.SetAlpha(100.0);
 						changed = true;
 					}
-
-					if (changed)
+					if (changed) {
 						obj.SetDisplayInfo(d);
+					}
 
 					// Recurse to handle nested clips (e.g. ChargeMeter_mc).
 					if (_depth > 0) {
@@ -278,7 +278,6 @@ void HUDManager::Update(float a_delta)
 
 	// 1. Determine Visibility Targets
 	bool shouldBeVisible = _userWantsVisible;
-
 	if (!shouldBeVisible) {
 		if ((settings->IsAlwaysShowInCombat() && isInCombat) ||
 			(settings->IsAlwaysShowWeaponDrawn() && isWeaponDrawn)) {
@@ -663,11 +662,9 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 			continue;
 		}
 		std::string menuName(name.c_str());
-
 		if (menuName == "HUD Menu" || Utils::IsSystemMenu(menuName)) {
 			continue;
 		}
-
 		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kApplicationMenu)) {
 			continue;
 		}
@@ -790,7 +787,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			processedPaths.insert(path);
 
 			int mode = settings->GetWidgetMode(path);
-
 			RE::GFxValue elem;
 			if (!a_movie->GetVariable(&elem, path) || !elem.IsDisplayObject()) {
 				continue;
@@ -817,16 +813,15 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// kIgnored block: simulates vanilla hide-when-full while fixing the reappear bug.
 			if (mode == Settings::kIgnored && isEnchantElement) {
 				float target = CalculateEnchantmentIgnoredAlpha(isEnchantLeft, isEnchantSkyHUD, menuOpen, alphaL, alphaR);
-
 				if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, alphaL, alphaR, 0.0f, 0, true);
 				}
-
 				dInfo.SetVisible(target > 0.01);
 				dInfo.SetAlpha(target);
 				elem.SetDisplayInfo(dInfo);
-				if (target > 0.1 && !isEnchantSkyHUD)
+				if (target > 0.1 && !isEnchantSkyHUD) {
 					EnforceEnchantMeterVisible(elem);
+				}
 				continue;
 			}
 
@@ -842,7 +837,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			bool shouldBeVisible = true;
 			double targetAlpha = managedAlpha;
-
 			if (mode == Settings::kHidden) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
@@ -914,7 +908,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		int mode = settings->GetWidgetMode(path);
-
 		// Menus active: relinquish control of dynamic widgets to allow 3rd party function.
 		if (menuOpen && mode != Settings::kHidden) {
 			continue;
@@ -993,24 +986,20 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		if (!entry.menu || !entry.menu->uiMovie) {
 			continue;
 		}
-
 		std::string menuNameStr(name.c_str());
 		if (menuNameStr == "HUD Menu") {
 			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha);
 			continue;
 		}
-
 		if (Utils::IsSystemMenu(menuNameStr)) {
 			continue;
 		}
 
 		int mode = settings->GetWidgetMode(menuNameStr);
-
 		// Menus active: relinquish control of external menus.
 		if (menuOpen && mode != Settings::kHidden) {
 			continue;
 		}
-
 		if (mode == Settings::kIgnored) {
 			continue;
 		}
@@ -1019,9 +1008,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		if (!entry.menu->uiMovie->GetVariable(&root, "_root")) {
 			continue;
 		}
-
 		RE::GFxValue::DisplayInfo dInfo;
-
 		if (mode == Settings::kVisible) {
 			dInfo.SetAlpha(100.0);
 		} else if (mode == Settings::kHidden) {
