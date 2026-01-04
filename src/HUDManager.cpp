@@ -349,16 +349,12 @@ void HUDManager::Update(float a_delta)
 	float targetSneak = 0.0f;
 	float sneakFadeSpeed = settings->GetFadeSpeed();
 	if (isSneaking && compat->IsSneakAllowed()) {
-		if (settings->GetSneakMeterSettings().enabled) {
+		// Priority Check: If Detection Meter mod is installed, force vanilla meter hidden.
+		if (compat->IsDetectionMeterInstalled()) {
+			targetSneak = 0.0f;
+		} else if (settings->GetSneakMeterSettings().enabled) {
 			// Contextual Authority: detection level math mixed with global toggle state
-			float detectionAlpha = 0.0f;
-
-			// Contextual: Target 85% opacity based on detection level (Unified 1st/3rd person)
-			if (compat->IsDetectionMeterInstalled()) {
-				detectionAlpha = 0.0f;
-			} else {
-				detectionAlpha = _lastDetectionLevel * 0.85f;
-			}
+			float detectionAlpha = _lastDetectionLevel * 0.85f;
 
 			targetSneak = std::max(detectionAlpha, _currentAlpha);
 			// ActionScript scaling (Detection modes only).
