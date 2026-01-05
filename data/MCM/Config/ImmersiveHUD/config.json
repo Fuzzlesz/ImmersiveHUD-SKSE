@@ -1,161 +1,164 @@
 {
-  "modName": "ImmersiveHUD",
-  "displayName": "$fzIH_ModName",
-  "pluginRequirements": [ "ImmersiveHUD.esp" ],
+  "$schema": "https://raw.githubusercontent.com/Exit-9B/MCM-Helper/main/docs/config.schema.json",
   "cursorFillMode": "topToBottom",
+  "displayName": "$fzIH_ModName",
+  "modName": "ImmersiveHUD",
   "pages": [
     {
-      "pageDisplayName": "$fzIH_PageGeneral",
       "content": [
         {
-          "type": "header",
-          "text": "$fzIH_HeaderHUD"
+          "text": "$fzIH_HeaderHUD",
+          "type": "header"
         },
         {
-          "type": "header",
-          "text": "$fzIH_HeaderContext"
+          "text": "$fzIH_HeaderContext",
+          "type": "header"
         },
         {
-          "type": "keymap",
-          "text": "$fzIH_ToggleKey",
-          "id": "iToggleKey:HUD",
           "help": "$fzIH_HelpToggleKey",
+          "id": "iToggleKey:HUD",
           "ignoreConflicts": true,
+          "text": "$fzIH_ToggleKey",
+          "type": "keymap",
           "valueOptions": {
-            "sourceType": "ModSettingInt",
-            "defaultValue": 45
+            "defaultValue": 45,
+            "sourceType": "ModSettingInt"
           }
         },
         {
-          "type": "toggle",
-          "text": "$fzIH_Crosshair",
-          "id": "bEnabled:Crosshair",
           "help": "$fzIH_HelpCrosshair",
+          "id": "bEnabled:Crosshair",
+          "text": "$fzIH_Crosshair",
+          "type": "toggle",
           "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": true
+            "defaultValue": true,
+            "sourceType": "ModSettingBool"
           }
         },
         {
-          "type": "slider",
-          "text": "$fzIH_DisplayDuration",
-          "id": "fDisplayDuration:HUD",
           "help": "$fzIH_HelpDisplayDuration",
-          "valueOptions": {
-            "sourceType": "ModSettingFloat",
-            "defaultValue": 0.0,
-            "min": 0.0,
-            "max": 10.0,
-            "step": 0.5,
-            "formatString": "{1}s"
-          }
-        },
-        {
-          "type": "toggle",
-          "text": "$fzIH_SneakMeter",
-          "id": "bEnabled:SneakMeter",
-          "help": "$fzIH_HelpSneakMeter",
-          "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": true
-          }
-        },
-        {
-          "type": "toggle",
-          "text": "$fzIH_HoldMode",
-          "id": "bHoldMode:HUD",
-          "help": "$fzIH_HelpHoldMode",
-          "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": false
-          }
-        },
-        {
-          "type": "empty"
-        },
-        {
-          "type": "toggle",
-          "text": "$fzIH_StartVisible",
-          "id": "bStartVisible:HUD",
-          "help": "$fzIH_HelpStartVisible",
-          "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": false
-          }
-        },
-        {
-          "type": "empty"
-        },
-        {
+          "id": "fDisplayDuration:HUD",
+          "text": "$fzIH_DisplayDuration",
           "type": "slider",
-          "text": "$fzIH_FadeSpeed",
-          "id": "iFadeSpeed:HUD",
-          "help": "$fzIH_HelpFadeSpeed",
           "valueOptions": {
-            "sourceType": "ModSettingInt",
-            "defaultValue": 5,
-            "min": 1,
-            "max": 20,
-            "step": 1,
-            "formatString": "{0}"
+            "defaultValue": 0.0,
+            "formatString": "{1}s",
+            "max": 10.0,
+            "min": 0.0,
+            "sourceType": "ModSettingFloat",
+            "step": 0.5
+          }
+        },
+        {
+          "help": "$fzIH_HelpSneakMeter",
+          "id": "bEnabled:SneakMeter",
+          "text": "$fzIH_SneakMeter",
+          "type": "toggle",
+          "valueOptions": {
+            "defaultValue": true,
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "help": "$fzIH_HelpHoldMode",
+          "id": "bHoldMode:HUD",
+          "text": "$fzIH_HoldMode",
+          "type": "toggle",
+          "valueOptions": {
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
           }
         },
         {
           "type": "empty"
         },
         {
+          "help": "$fzIH_HelpStartVisible",
+          "id": "bStartVisible:HUD",
+          "text": "$fzIH_StartVisible",
           "type": "toggle",
-          "text": "$fzIH_ShowCombat",
-          "id": "bShowInCombat:HUD",
+          "valueOptions": {
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "help": "$fzIH_HelpFadeSpeed",
+          "id": "iFadeSpeed:HUD",
+          "text": "$fzIH_FadeSpeed",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 5,
+            "formatString": "{0}",
+            "max": 20,
+            "min": 1,
+            "sourceType": "ModSettingInt",
+            "step": 1
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
           "help": "$fzIH_HelpShowCombat",
+          "id": "bShowInCombat:HUD",
+          "text": "$fzIH_ShowCombat",
+          "type": "toggle",
           "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": true
+            "defaultValue": true,
+            "sourceType": "ModSettingBool"
           }
         },
         {
-          "type": "header",
-          "text": "$fzIH_HeaderDebug"
+          "text": "$fzIH_HeaderDebug",
+          "type": "header"
         },
         {
-          "type": "toggle",
-          "text": "$fzIH_ShowWeapon",
-          "id": "bShowWeaponDrawn:HUD",
           "help": "$fzIH_HelpShowWeapon",
+          "id": "bShowWeaponDrawn:HUD",
+          "text": "$fzIH_ShowWeapon",
+          "type": "toggle",
           "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": true
+            "defaultValue": true,
+            "sourceType": "ModSettingBool"
           }
         },
         {
-          "type": "toggle",
-          "text": "$fzIH_DumpHUD",
-          "id": "bDumpHUD:HUD",
           "help": "$fzIH_HelpDumpHUD",
+          "id": "bDumpHUD:HUD",
+          "text": "$fzIH_DumpHUD",
+          "type": "toggle",
           "valueOptions": {
-            "sourceType": "ModSettingBool",
-            "defaultValue": false
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
           }
         }
-      ]
+      ],
+      "pageDisplayName": "$fzIH_PageGeneral"
     },
     {
-      "pageDisplayName": "$fzIH_PageElements",
       "content": [
         {
-          "type": "text",
-          "text": "$fzIH_ElementNewFound"
+          "text": "$fzIH_ElementNewFound",
+          "type": "text"
         }
-      ]
+      ],
+      "pageDisplayName": "$fzIH_PageElements"
     },
     {
-      "pageDisplayName": "$fzIH_PageWidgets",
       "content": [
         {
-          "type": "text",
-          "text": "$fzIH_WidgetNewFound"
+          "text": "$fzIH_WidgetNewFound",
+          "type": "text"
         }
-      ]
+      ],
+      "pageDisplayName": "$fzIH_PageWidgets"
     }
+  ],
+  "pluginRequirements": [
+    "ImmersiveHUD.esp"
   ]
 }

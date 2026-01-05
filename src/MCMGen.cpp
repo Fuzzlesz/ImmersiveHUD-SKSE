@@ -73,16 +73,17 @@ namespace MCMGen
 			optionsList.push_back("$fzIH_ModeTDMDisabled");
 		}
 
-		//Note to self: Further options get added here, after TDM, so we maintain positioning.
+		// Note to self: Further options get added here, after TDM, so we maintain positioning.
 
+		// Construct in alphabetical order to match MCM Helper output structure
 		return {
-			{ "text", a_text },
-			{ "type", "enum" },
 			{ "help", a_help },
 			{ "id", a_id },
-			{ "valueOptions", { { "sourceType", "ModSettingInt" },
-								  { "defaultValue", 1 },
-								  { "options", optionsList } } }
+			{ "text", a_text },
+			{ "type", "enum" },
+			{ "valueOptions", { { "defaultValue", 1 },
+								  { "options", optionsList },
+								  { "sourceType", "ModSettingInt" } } }
 		};
 	}
 
@@ -162,7 +163,9 @@ namespace MCMGen
 
 			for (const auto& page : config["pages"]) {
 				std::string pName = page.value("pageDisplayName", "");
-				if (pName == "$fzIH_PageWidgets" && page.contains("content")) {
+
+				// Scan both Widget and Element pages to recover IDs
+				if ((pName == "$fzIH_PageWidgets" || pName == "$fzIH_PageElements") && page.contains("content")) {
 					for (const auto& item : page["content"]) {
 						if (item.contains("help")) {
 							std::string help = item["help"].get<std::string>();
@@ -173,7 +176,11 @@ namespace MCMGen
 							size_t srcPos = help.find("Source: ");
 							if (srcPos != std::string::npos) {
 								size_t endSrc = help.find('\n', srcPos);
-								sourceStr = help.substr(srcPos + 8, endSrc - (srcPos + 8));
+								if (endSrc != std::string::npos) {
+									sourceStr = help.substr(srcPos + 8, endSrc - (srcPos + 8));
+								} else {
+									sourceStr = help.substr(srcPos + 8);
+								}
 							}
 
 							// Parse "ID: [PATH]"
@@ -315,10 +322,10 @@ namespace MCMGen
 			if (elementsContent) {
 				elementsContent->clear();
 				if (_iniModifiedThisSession) {
-					elementsContent->push_back({ { "text", "$fzIH_ElementNewFound" }, { "type", "text" }, { "id", "ElemStatus" } });
+					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "$fzIH_ElementNewFound" }, { "type", "text" } });
 				} else {
-					elementsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
-						{ "type", "text" }, { "id", "ElemStatus" } });
+					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
+						{ "type", "text" } });
 				}
 				elementsContent->push_back({ { "type", "header" } });
 				for (const auto& widgetJson : elementsJsonList) {
@@ -329,10 +336,10 @@ namespace MCMGen
 			if (widgetsContent) {
 				widgetsContent->clear();
 				if (_iniModifiedThisSession) {
-					widgetsContent->push_back({ { "text", "$fzIH_WidgetNewFound" }, { "type", "text" }, { "id", "WidStatus" } });
+					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "$fzIH_WidgetNewFound" }, { "type", "text" } });
 				} else {
-					widgetsContent->push_back({ { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },
-						{ "type", "text" }, { "id", "WidStatus" } });
+					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },
+						{ "type", "text" } });
 				}
 				widgetsContent->push_back({ { "type", "header" } });
 				for (const auto& [id, widgetJson] : finalWidgetsMap) {
@@ -344,6 +351,7 @@ namespace MCMGen
 			if (config != originalConfig) {
 				std::ofstream outFile(configPath, std::ios::trunc);
 				if (outFile.is_open()) {
+					// Use 2-space indent, nlohmann usually defaults to alpha keys
 					outFile << config.dump(2);
 					outFile.close();
 				}
