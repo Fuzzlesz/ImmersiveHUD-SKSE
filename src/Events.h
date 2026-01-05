@@ -5,7 +5,7 @@
 #include "Settings.h"
 #include "Utils.h"
 
-namespace Events
+	namespace Events
 {
 	class InputEventSink : public RE::BSTEventSink<RE::InputEvent*>
 	{
@@ -33,13 +33,21 @@ namespace Events
 			auto settings = Settings::GetSingleton();
 			auto key = settings->GetToggleKey();
 
-			if (key == static_cast<std::uint32_t>(-1)) {
+			if (key == static_cast<std::uint32_t>(-1) || key == 0) {
 				return RE::BSEventNotifyControl::kContinue;
 			}
 
 			for (auto event = *a_event; event; event = event->next) {
 				if (auto button = event->AsButtonEvent()) {
-					if (button->GetIDCode() == key) {
+					auto idCode = button->GetIDCode();
+					auto device = button->GetDevice();
+
+					// Normalize Gamepad Input (Raw XInput Bitmask -> SkyUI Key Code)
+					if (device == RE::INPUT_DEVICE::kGamepad) {
+						idCode = RemapGamepadCode(idCode);
+					}
+
+					if (idCode == key) {
 						if (button->IsDown()) {
 							HUDManager::GetSingleton()->OnButtonDown();
 						} else if (button->IsUp()) {
@@ -52,6 +60,49 @@ namespace Events
 		}
 
 	private:
+		// Helper to map XInput driver masks to SkyUI integer codes
+		static std::uint32_t RemapGamepadCode(std::uint32_t a_rawCode)
+		{
+			using namespace REX::W32;
+
+			switch (a_rawCode) {
+			case XINPUT_GAMEPAD_DPAD_UP:
+				return 266;
+			case XINPUT_GAMEPAD_DPAD_DOWN:
+				return 267;
+			case XINPUT_GAMEPAD_DPAD_LEFT:
+				return 268;
+			case XINPUT_GAMEPAD_DPAD_RIGHT:
+				return 269;
+			case XINPUT_GAMEPAD_START:
+				return 270;
+			case XINPUT_GAMEPAD_BACK:
+				return 271;
+			case XINPUT_GAMEPAD_LEFT_THUMB:
+				return 272;
+			case XINPUT_GAMEPAD_RIGHT_THUMB:
+				return 273;
+			case XINPUT_GAMEPAD_LEFT_SHOULDER:
+				return 274;
+			case XINPUT_GAMEPAD_RIGHT_SHOULDER:
+				return 275;
+			case XINPUT_GAMEPAD_A:
+				return 276;
+			case XINPUT_GAMEPAD_B:
+				return 277;
+			case XINPUT_GAMEPAD_X:
+				return 278;
+			case XINPUT_GAMEPAD_Y:
+				return 279;
+			case 0x9:
+				return 280;  // LT
+			case 0xA:
+				return 281;  // RT
+			default:
+				return a_rawCode;
+			}
+		}
+
 		InputEventSink() = default;
 		InputEventSink(const InputEventSink&) = delete;
 		InputEventSink(InputEventSink&&) = delete;
@@ -75,7 +126,7 @@ namespace Events
 			}
 		}
 
-    RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override
+		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override
 		{
 			if (!a_event) {
 				return RE::BSEventNotifyControl::kContinue;
