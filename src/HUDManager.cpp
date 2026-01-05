@@ -8,7 +8,7 @@
 #include <numbers>
 
 // ==========================================
-// Internal Helpers
+// Utility Classes
 // ==========================================
 
 namespace
@@ -493,7 +493,7 @@ void HUDManager::Update(float a_delta)
 }
 
 // ==========================================
-// Menu & Widget Management
+// Global HUD Visibility Check
 // ==========================================
 
 bool HUDManager::ShouldHideHUD()
@@ -521,6 +521,10 @@ bool HUDManager::ShouldHideHUD()
 	return false;
 }
 
+// ==========================================
+//  Health/Magicka/Stamina Meter Helpers
+// ==========================================
+
 // Depth 0 is critical: protects Survival penalties and resource blinking from freezing.
 void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent)
 {
@@ -540,7 +544,7 @@ void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
 }
 
 // ==========================================
-// Enchantment Bar Helpers
+// Enchantment Charge Meter Helpers
 // ==========================================
 
 bool HUDManager::IsEnchantmentElement(const char* a_elementId, bool& a_isLeft, bool& a_isRight, bool& a_isSkyHUD) const
@@ -627,6 +631,10 @@ double HUDManager::CalculateEnchantmentTargetAlpha(bool a_isEnchantLeft,
 		return std::min(tracked, static_cast<float>(a_managedAlpha));
 	}
 }
+
+// ==========================================
+// Scanning Helpers
+// ==========================================
 
 void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes)
 {
@@ -751,6 +759,10 @@ void HUDManager::DumpHUDStructure()
 		}
 	}
 }
+
+// ==========================================
+// HUD Application
+// ==========================================
 
 void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float a_globalAlpha)
 {
