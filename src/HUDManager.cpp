@@ -349,10 +349,7 @@ void HUDManager::Update(float a_delta)
 	float targetSneak = 0.0f;
 	float sneakFadeSpeed = settings->GetFadeSpeed();
 	if (isSneaking && compat->IsSneakAllowed()) {
-		// Priority Check: If Detection Meter mod is installed, force vanilla meter hidden.
-		if (compat->IsDetectionMeterInstalled()) {
-			targetSneak = 0.0f;
-		} else if (settings->GetSneakMeterSettings().enabled) {
+		if (settings->GetSneakMeterSettings().enabled) {
 			// Contextual Authority: detection level math mixed with global toggle state
 			float detectionAlpha = _lastDetectionLevel * 0.85f;
 
