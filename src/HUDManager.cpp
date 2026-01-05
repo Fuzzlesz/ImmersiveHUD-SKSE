@@ -307,15 +307,15 @@ void HUDManager::Update(float a_delta)
 	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
 	float targetLockedOn = isLockedOn ? 100.0f : 0.0f;
 
+	// Calculate Contextual States
+	// Action: Aiming a Bow, Casting an Aimed Spell.
+	bool isActionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
+	// Look: Hovering over a valid interactable object.
+	bool isLookActive = compat->IsCrosshairTargetValid() && !isBTPS;
+
 	// Crosshair Target Alpha
 	float targetCtx = 0.0f;
 	if (settings->GetCrosshairSettings().enabled) {
-		// Contextual: Active combat state (Ranged / Magic)
-		bool isActionActive = compat->IsPlayerCasting(player) || compat->IsPlayerAttacking(player);
-
-		// Contextual: Interaction state (valid pick target)
-		bool isLookActive = compat->IsCrosshairTargetValid() && !isBTPS;
-
 		// Visibility Authority: Merge contextual states.
 		bool shouldDrawCrosshair = (isActionActive || isLookActive);
 
@@ -352,6 +352,12 @@ void HUDManager::Update(float a_delta)
 		if (settings->GetSneakMeterSettings().enabled) {
 			// Contextual Authority: detection level math mixed with global toggle state
 			float detectionAlpha = _lastDetectionLevel * 0.85f;
+
+			// Detection Meter Compatibility:
+			// If installed, hide vanilla meter unless we are aiming (Contextual Crosshair logic).
+			if (compat->IsDetectionMeterInstalled()) {
+				detectionAlpha = isActionActive ? 100.0f : 0.0f;
+			}
 
 			targetSneak = std::max(detectionAlpha, _currentAlpha);
 			// ActionScript scaling (Detection modes only).
