@@ -29,6 +29,7 @@ public:
 
 	void Load();
 	void ResetCache();
+	void SetDumpHUDEnabled(bool a_enabled);
 
 	[[nodiscard]] bool AddDiscoveredPath(const std::string& a_path, const std::string& a_source = "");
 

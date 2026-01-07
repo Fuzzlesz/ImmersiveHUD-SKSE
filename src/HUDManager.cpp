@@ -224,6 +224,8 @@ void HUDManager::OnButtonDown()
 	if (settings->IsDumpHUDEnabled()) {
 		SKSE::GetTaskInterface()->AddUITask([this]() {
 			DumpHUDStructure();
+			Settings::GetSingleton()->SetDumpHUDEnabled(false);
+			logger::info("Dump complete. 'bDumpHUD' has been disabled in settings.");
 		});
 	}
 
@@ -785,9 +787,15 @@ void HUDManager::DumpHUDStructure()
 	}
 
 	logger::info("=== DUMPING MENUS ===");
+	// Iterate the entire map, not just open menus, to see everything registered.
 	for (auto& [name, entry] : ui->menuMap) {
-		if (entry.menu && entry.menu->uiMovie) {
-			logger::info("[Menu] {} [Source: {}]", name.c_str(), Utils::GetMenuURL(entry.menu->uiMovie));
+		bool isOpen = entry.menu && entry.menu->uiMovie;
+
+		if (isOpen) {
+			std::string src = Utils::GetMenuURL(entry.menu->uiMovie);
+			logger::info("[Menu] [OPEN]   {} [Source: {}]", name.c_str(), src);
+		} else {
+			logger::info("[Menu] [CLOSED] {}", name.c_str());
 		}
 	}
 
@@ -796,6 +804,7 @@ void HUDManager::DumpHUDStructure()
 		RE::GFxValue root;
 		if (hud->uiMovie->GetVariable(&root, "_root")) {
 			logger::info("=== DUMPING HUD ROOT ===");
+			// Change depth value here to explore deeper levels of the HUD structure.
 			Utils::DebugVisitor visitor("_root", 3);
 			root.VisitMembers(&visitor);
 		}

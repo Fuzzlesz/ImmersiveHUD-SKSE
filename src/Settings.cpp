@@ -90,6 +90,24 @@ void Settings::ResetCache()
 	_widgetPathToMode.clear();
 }
 
+void Settings::SetDumpHUDEnabled(bool a_enabled)
+{
+	_dumpHUD = a_enabled;
+
+	CSimpleIniA ini;
+	ini.SetUnicode();
+
+	// We only load/save the User Settings file (not the Config default)
+	const char* userPath = "Data/MCM/Settings/ImmersiveHUD.ini";
+
+	// Try to load existing user settings to preserve other values
+	ini.LoadFile(userPath);
+
+	ini.SetLongValue("HUD", "bDumpHUD", a_enabled ? 1 : 0);
+
+	ini.SaveFile(userPath);
+}
+
 bool Settings::AddDiscoveredPath(const std::string& a_path, const std::string& a_source)
 {
 	// Check if already exists first to avoid string ops
