@@ -110,6 +110,7 @@ namespace Utils
 
 	bool IsSystemMenu(const std::string& a_menuName)
 	{
+		// Fader Menu excluded to preserve vanilla fade timing
 		static const std::unordered_set<std::string> systemMenus = {
 			"LevelUp Menu", "Credits Menu", "TitleSequence Menu",
 			"Dialogue Menu", "Lockpicking Menu", "Creation Club Menu", "LoadWaitSpinner",

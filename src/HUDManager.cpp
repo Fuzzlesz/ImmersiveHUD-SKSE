@@ -693,7 +693,9 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 			continue;
 		}
 		std::string menuName(name.c_str());
-		if (menuName == "HUD Menu" || Utils::IsSystemMenu(menuName)) {
+
+		// Explicitly exclude Fader Menu here to preserve vanilla fade timing.
+		if (menuName == "HUD Menu" || menuName == "Fader Menu" || Utils::IsSystemMenu(menuName)) {
 			continue;
 		}
 		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kApplicationMenu)) {
@@ -1089,6 +1091,12 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			ApplyHUDMenuSpecifics(entry.menu->uiMovie, a_alpha);
 			continue;
 		}
+
+		// Skip Fader Menu to prevent interference with vanilla fade timing
+		if (menuNameStr == "Fader Menu") {
+			continue;
+		}
+
 		if (Utils::IsSystemMenu(menuNameStr)) {
 			continue;
 		}
