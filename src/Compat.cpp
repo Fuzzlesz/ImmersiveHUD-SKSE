@@ -172,20 +172,20 @@ bool Compat::IsPlayerWeaponDrawn()
 }
 
 bool Compat::CameraStateCheck()
+// We return true here to Force-Hide the HUD (ShouldHideHUD returns true)
+// This overrides even elements set to "Visible" in the MCM.
 {
 	auto camera = RE::PlayerCamera::GetSingleton();
 	if (!camera || !camera->currentState) {
 		return false;
 	}
 
+	// VATS / Kill Cam
 	if (camera->currentState == camera->cameraStates[RE::CameraState::kVATS]) {
 		return true;
 	}
 
-	if (camera->IsInFreeCameraMode()) {
-		return true;
-	}
-
+	// Auto Vanity / Vanity Cam
 	if (camera->currentState == camera->cameraStates[RE::CameraState::kAutoVanity]) {
 		return true;
 	}
