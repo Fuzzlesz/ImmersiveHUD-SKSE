@@ -1010,7 +1010,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		int mode = settings->GetWidgetMode(path);
+
 		// Menus active: relinquish control of dynamic widgets to allow 3rd party function.
+		// Important for mod-added system menus, and widgets open during vanilla menus.
 		if (menuOpen && mode != Settings::kHidden) {
 			continue;
 		}
@@ -1102,7 +1104,9 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		int mode = settings->GetWidgetMode(menuNameStr);
+
 		// Menus active: relinquish control of external menus.
+		// Important for mod-added system menus, and widgets open during vanilla menus.
 		if (menuOpen && mode != Settings::kHidden) {
 			continue;
 		}
