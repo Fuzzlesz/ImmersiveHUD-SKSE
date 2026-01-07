@@ -957,6 +957,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			bool shouldBeVisible = true;
 			double targetAlpha = managedAlpha;
+
 			if (mode == Settings::kHidden) {
 				shouldBeVisible = false;
 				targetAlpha = 0.0;
@@ -993,17 +994,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					targetAlpha = ctxBased;
 					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
-					// Check master toggle and transient state triggers
-					bool shouldShow = _userWantsVisible;
-					if (!shouldShow) {
-						if ((settings->IsAlwaysShowInCombat() && isInCombat) ||
-							(settings->IsAlwaysShowWeaponDrawn() && isWeaponDrawn)) {
-							shouldShow = true;
-						}
-					}
-					// Synchronize with global HUD fade and menu safety
-					shouldBeVisible = shouldShow && !menuOpen;
-					targetAlpha = shouldShow ? managedAlpha : 0.0;
+					targetAlpha = managedAlpha;
+					shouldBeVisible = (targetAlpha > 0.01) && !menuOpen;
 				}
 			}
 
@@ -1092,7 +1084,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetVisible(lockedOnAlpha > 0.01);
 			dInfo.SetAlpha(lockedOnAlpha);
 		} else {
-			dInfo.SetVisible(managedAlpha > 0.1f);
+			dInfo.SetVisible(managedAlpha > 0.01f);
 			dInfo.SetAlpha(managedAlpha);
 		}
 		elem.SetDisplayInfo(dInfo);
