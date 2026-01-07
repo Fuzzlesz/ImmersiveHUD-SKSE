@@ -173,10 +173,12 @@ namespace Utils
 				url = urlVal.GetString();
 			}
 
+			// Always increment count for valid widgets, whether new or old
+			a_foundCount++;
+
 			if (Settings::GetSingleton()->AddDiscoveredPath(widgetPath, url)) {
 				a_changes = true;
-				a_foundCount++;
-				logger::info("Discovered SkyUI Element: {} [Source: {}]", widgetPath, url);
+				logger::info("Discovered SkyUI Widget: {} [Source: {}]", widgetPath, url);
 			}
 		}
 	}
@@ -284,10 +286,12 @@ namespace Utils
 
 				// Skip the HUD menu itself
 				if (!url.ends_with("hudmenu.swf") && !url.ends_with("HUDMenu.swf")) {
+					// Always increment found count for population check
+					_count++;
+
 					if (Settings::GetSingleton()->AddDiscoveredPath(currentPath, url)) {
 						_changes = true;
-						_count++;
-						logger::info("Discovered Element: {} [Source: {}]", currentPath, url);
+						logger::info("Discovered External Element: {} [Source: {}]", currentPath, url);
 					}
 					// Don't recurse into discovered widgets - we've found what we need
 					return;

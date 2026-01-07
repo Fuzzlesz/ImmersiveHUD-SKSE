@@ -11,31 +11,13 @@ namespace MCMGen
 {
 	static bool _iniModifiedThisSession = false;
 
-	bool WidgetSourceExists(const std::string& a_source)
+bool WidgetSourceExists(const std::string& a_source)
 	{
 		if (a_source.empty() || a_source == "Unknown") {
 			return true;
 		}
 
-		// Trust list for internal components or those likely to be in BSAs
-		std::string lowerPath = a_source;
-		std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
-
-		static const std::vector<std::string> kTrustList = {
-			"internal/",
-			"skyui",
-			"hudmenu",
-			"vanilla",
-			"exported/"
-		};
-
-		for (const auto& w : kTrustList) {
-			if (lowerPath.find(w) != std::string::npos) {
-				return true;
-			}
-		}
-
-		// Check for loose files on disk to identify uninstalled mods
+		// 1. Clean and Normalize Path
 		std::string path = a_source;
 		if (path.starts_with("file:///")) {
 			path = path.substr(8);
@@ -43,8 +25,24 @@ namespace MCMGen
 		std::replace(path.begin(), path.end(), '|', ':');
 		std::replace(path.begin(), path.end(), '\\', '/');
 
+		std::string lowerPath = path;
+		std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+
+		// 2. Internal / Vanilla Components
+		if (lowerPath.starts_with("internal/") || lowerPath.find("hudmenu") != std::string::npos) {
+			return true;
+		}
+
+		// 3. Loose File Check
 		std::error_code ec;
 		if (fs::exists(fs::path("Data") / path, ec)) {
+			return true;
+		}
+
+		// 4. SkyUI Widget Check
+		// This protects widgets in BSAs or not currently loaded in memory when check runs.
+		if (lowerPath.find("widgets/") != std::string::npos ||
+			lowerPath.find("/skyui/") != std::string::npos) {
 			return true;
 		}
 
@@ -121,7 +119,7 @@ namespace MCMGen
 		json data;
 	};
 
-	void Update(bool a_isRuntime)
+	void Update(bool a_isRuntime, bool a_widgetsPopulated)
 	{
 		const fs::path configDir = "Data/MCM/Config/ImmersiveHUD";
 		const fs::path configPath = configDir / "config.json";
@@ -158,8 +156,23 @@ namespace MCMGen
 				config["pages"] = json::array();
 			}
 
-			// 2. Recover persisted paths from existing config & prune dead entries
+			// 2. Recover persisted paths & Prune dead entries
 			std::map<std::string, std::string> allPaths;
+
+			// Track IDs present in the previous session's JSON
+			std::unordered_set<std::string> previousJsonIDs;
+
+			// Lookup set for Hardcoded/Vanilla paths to prevent flagging them as "New"
+			std::unordered_set<std::string> hardcodedVanillaPaths;
+			for (const auto& def : HUDElements::Get()) {
+				for (const auto& p : def.paths) {
+					hardcodedVanillaPaths.insert(p);
+				}
+			}
+
+			// Grab currently active paths from memory
+			const auto settings = Settings::GetSingleton();
+			const auto& activePaths = settings->GetSubWidgetPaths();
 
 			for (const auto& page : config["pages"]) {
 				std::string pName = page.value("pageDisplayName", "");
@@ -193,8 +206,29 @@ namespace MCMGen
 							}
 
 							if (!rawID.empty()) {
-								// Keep entry if the mod is still installed, otherwise discard
-								if (WidgetSourceExists(sourceStr)) {
+								previousJsonIDs.insert(rawID);
+
+								std::string lowerSrc = sourceStr;
+								std::transform(lowerSrc.begin(), lowerSrc.end(), lowerSrc.begin(), ::tolower);
+
+								// Heuristic: Is this a SkyUI widget? 💁🦋
+								bool isWidget = (lowerSrc.find("widgets/") != std::string::npos) ||
+								                (lowerSrc.find("skyui") != std::string::npos);
+
+								// Pruning Guard: SkyUI widgets are late-loading.
+								// During Initial Scans (before the HUD Menu loads), the WidgetContainer is empty.
+								// We must skip pruning these specific IDs until we are in Runtime and know the container is populated.
+								// Otherwise, installed widgets would be wrongly flagged as uninstalled and removed from the config.
+								if (isWidget && !a_widgetsPopulated) {
+									allPaths[rawID] = sourceStr;
+									continue;
+								}
+
+								// Check: Persistence validity (Disk presence or active memory).
+								bool existsOnDisk = WidgetSourceExists(sourceStr);
+								bool existsInMemory = activePaths.contains(rawID);
+
+								if (existsOnDisk || existsInMemory) {
 									allPaths[rawID] = sourceStr;
 								} else {
 									logger::info("Pruning uninstalled widget: {} (Source: {})", rawID, sourceStr);
@@ -206,11 +240,21 @@ namespace MCMGen
 			}
 
 			// Merge in new runtime discovery data
-			const auto settings = Settings::GetSingleton();
+			bool foundNewWidgetInJson = false;
 			auto memPaths = settings->GetSubWidgetPaths();
+
 			for (const auto& path : memPaths) {
 				std::string src = settings->GetWidgetSource(path);
 				allPaths[path] = src;
+
+				// Detection Logic: Was this widget missing from the previous config?
+				if (!previousJsonIDs.contains(path)) {
+					// Ignore vanilla secondary paths (e.g. HealthMeterLeft) to prevent false positives.
+					if (hardcodedVanillaPaths.contains(path)) {
+						continue;
+					}
+					foundNewWidgetInJson = true;
+				}
 			}
 
 			// 3. Generate Content for "HUD Elements" Page
@@ -302,8 +346,14 @@ namespace MCMGen
 			}
 
 			// 5. Calculate Status Flags
-			if (!a_isRuntime && (!newIniKeysElements.empty() || !newIniKeysWidgets.empty())) {
-				_iniModifiedThisSession = true;
+			// If new content is discovered during Initial Scans (!Runtime),
+			// we flag the session to display the "Restart Required" warning.
+			// Once Runtime is set (After HUD Menu Loaded), we stop triggering this flag
+			// as the MCM page cannot visually update, which would lead to stale messages.
+			if (!a_isRuntime) {
+				if (!newIniKeysElements.empty() || !newIniKeysWidgets.empty() || foundNewWidgetInJson) {
+					_iniModifiedThisSession = true;
+				}
 			}
 
 			// 6. Inject JSON Content
@@ -319,9 +369,11 @@ namespace MCMGen
 				}
 			}
 
+			bool showRestartWarning = _iniModifiedThisSession;
+
 			if (elementsContent) {
 				elementsContent->clear();
-				if (_iniModifiedThisSession) {
+				if (showRestartWarning) {
 					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "$fzIH_ElementNewFound" }, { "type", "text" } });
 				} else {
 					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
@@ -335,7 +387,7 @@ namespace MCMGen
 
 			if (widgetsContent) {
 				widgetsContent->clear();
-				if (_iniModifiedThisSession) {
+				if (showRestartWarning) {
 					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "$fzIH_WidgetNewFound" }, { "type", "text" } });
 				} else {
 					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },

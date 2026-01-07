@@ -6,11 +6,13 @@ public:
 	// Initialization and Hooks
 	void InstallHooks();
 	void Reset(bool a_refreshUserPreference = false);
+	void StartRuntime();
 
 	// Widget Scanning and Discovery
 	void ScanIfReady();
 	void ForceScan();
 	void RegisterNewMenu();
+	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRuntime);
 
 	// Input Handling
 	void OnButtonDown();
@@ -25,6 +27,10 @@ public:
 
 	// Status Getters
 	[[nodiscard]] bool IsSkyHUDActive() const { return _isSkyHUDActive; }
+	[[nodiscard]] bool IsRuntime() const { return _isRuntime; }
+
+	// Session State
+	void ResetSession();
 
 private:
 	// Alpha Application Logic
@@ -47,7 +53,6 @@ private:
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
 
 	// Internal Scanning Logic
-	void ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRuntime = true);
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
 
 	// Debugging
@@ -60,6 +65,8 @@ private:
 	bool _wasHidden = false;
 	std::atomic_bool _isScanPending = false;
 	bool _isSkyHUDActive = false;
+	bool _widgetsPopulated = false;
+	bool _isRuntime = false;
 
 	// Alpha Transition Values
 	float _currentAlpha = 0.0f;

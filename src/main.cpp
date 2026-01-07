@@ -49,10 +49,6 @@ void OnInit(SKSE::MessagingInterface::Message* a_msg)
 		compat->InitExternalData();
 		break;
 
-	case SKSE::MessagingInterface::kPostLoadGame:
-		HUDManager::GetSingleton()->ScanIfReady();
-		HUDManager::GetSingleton()->Reset(true);
-		break;
 	}
 }
 

@@ -1,7 +1,7 @@
-#include "HUDManager.h"
 #include "Compat.h"
 #include "Events.h"
 #include "HUDElements.h"
+#include "HUDManager.h"
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -154,6 +154,20 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	Update(0.0f);
 }
 
+void HUDManager::ResetSession()
+{
+	_isRuntime = false;
+	_hasScanned = false;
+}
+
+void HUDManager::StartRuntime()
+{
+	_isRuntime = true;
+	// Reset scanned flag so the transition from Initial Scans -> Runtime Scans
+	// forces a fresh scan to populate the runtime JSON.
+	_hasScanned = false;
+}
+
 void HUDManager::ScanIfReady()
 {
 	if (_hasScanned || _isScanPending) {
@@ -164,11 +178,11 @@ void HUDManager::ScanIfReady()
 		_isScanPending = true;
 
 		// Session initial scan: capture runtime status then flip scanned flag
-		bool isRuntime = _hasScanned;
 		_hasScanned = true;
 
-		SKSE::GetTaskInterface()->AddUITask([this, isRuntime]() {
-			ScanForWidgets(false, true, isRuntime);
+		SKSE::GetTaskInterface()->AddUITask([this]() {
+			// Routine scan (Runtime=true, Deep=true)
+			ScanForWidgets(false, true, true);
 			_isScanPending = false;
 		});
 	}
@@ -176,11 +190,15 @@ void HUDManager::ScanIfReady()
 
 void HUDManager::RegisterNewMenu()
 {
-	if (_isScanPending) {
+	// Suppress event-based scanning until Runtime to prevent
+	// duplicate/deep scanning during the loading sequence.
+	if (!_isRuntime || _isScanPending) {
 		return;
 	}
+
 	_isScanPending = true;
 	SKSE::GetTaskInterface()->AddUITask([this]() {
+		// New menu appearing mid-game (Runtime=true, Deep=true)
 		ScanForWidgets(false, true, true);
 		_isScanPending = false;
 	});
@@ -188,6 +206,7 @@ void HUDManager::RegisterNewMenu()
 
 void HUDManager::ForceScan()
 {
+	// Manual user scan (Runtime=true, Deep=true)
 	ScanForWidgets(true, true, true);
 }
 
@@ -260,8 +279,9 @@ void HUDManager::Update(float a_delta)
 		_scanTimer += a_delta;
 		if (_scanTimer > 2.0f) {
 			_scanTimer = 0.0f;
-			if (_hasScanned) {
+			if (_hasScanned && _isRuntime) {
 				SKSE::GetTaskInterface()->AddUITask([this]() {
+					// Periodic scan (Runtime=true)
 					ScanForWidgets(false, true, true);
 				});
 			}
@@ -725,14 +745,27 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 		}
 	}
 
+	// Heuristic: If we detect active containers, SkyUI has finished loading.
+	// We set this flag to true to allow MCMGen to safely prune uninstalled widgets.
+	// Until this is true (during Initial Scans), we protect widgets from being removed.
+	if (containerCount > 0) {
+		_widgetsPopulated = true;
+	}
+
+	// Only proceed to update config.json if something actually changed.
 	if (changes || a_forceUpdate) {
 		Settings::GetSingleton()->Load();
 
-		// Use a_isRuntime to determine Init vs Runtime state for MCMGen status
-		MCMGen::Update(a_isRuntime);
+		// Update MCM JSON.
+		// 1. Pass a_isRuntime to control Status Text (avoid stale "New Found" messages).
+		// 2. Pass _widgetsPopulated to Safe Prune (skip missing widgets if false).
+		MCMGen::Update(a_isRuntime, _widgetsPopulated);
 
-		if (changes) {
-			logger::info("Scan complete (Deep={}). Found {} external, {} internal.", a_deepScan, externalCount, containerCount);
+		// Only log if we found new *user* content (External/Widgets).
+		// Silently handle vanilla internal updates to avoid log spam when counts are 0.
+		if (changes && (externalCount > 0 || containerCount > 0)) {
+			logger::info("Config updated [Runtime={}]. Found {} external, {} internal.",
+				a_isRuntime, externalCount, containerCount);
 		}
 	}
 }
