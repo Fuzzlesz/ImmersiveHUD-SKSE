@@ -73,15 +73,22 @@ namespace
 // Hooks
 // ==========================================
 
-struct PlayerUpdateHook
+struct HUDMenuAdvanceMovieHook
 {
-	static void thunk(RE::PlayerCharacter* a_this, float a_delta)
+	static void thunk(RE::HUDMenu* a_this, float a_interval, std::uint32_t a_currentTime)
 	{
-		func(a_this, a_delta);
-		HUDManager::GetSingleton()->Update(a_delta);
+		func(a_this, a_interval, a_currentTime);
+
+		// If the simulation is frozen (e.g. 'tfc 1'), inject our own delta so we're still able to control HUD
+		float effectiveDelta = a_interval;
+		if (effectiveDelta <= 0.0001f) {
+			effectiveDelta = 0.0166f;
+		}
+
+		HUDManager::GetSingleton()->Update(effectiveDelta);
 	}
 	static inline REL::Relocation<decltype(thunk)> func;
-	static constexpr std::size_t size = 0xAD;
+	static constexpr std::size_t size = 0x05;
 };
 
 struct StealthMeterHook
@@ -106,7 +113,7 @@ void HUDManager::InstallHooks()
 	Events::InputEventSink::Register();
 	Events::MenuOpenCloseEventSink::Register();
 
-	stl::write_vfunc<RE::PlayerCharacter, PlayerUpdateHook>();
+	stl::write_vfunc<RE::HUDMenu, HUDMenuAdvanceMovieHook>();
 	stl::write_vfunc<RE::StealthMeter, StealthMeterHook>();
 
 	// Load settings first so we can read the preference
