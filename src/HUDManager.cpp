@@ -805,6 +805,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const auto compat = Compat::GetSingleton();
 	const auto player = RE::PlayerCharacter::GetSingleton();
 	const bool menuOpen = ShouldHideHUD();
+	const auto ui = RE::UI::GetSingleton();
+	const bool isConsoleOpen = ui && ui->IsMenuOpen(RE::Console::MENU_NAME);
 
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
@@ -1038,7 +1040,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 		// Menus active: relinquish control of dynamic widgets to allow 3rd party function.
 		// Important for mod-added system menus, and widgets open during vanilla menus.
-		if (menuOpen && mode != Settings::kHidden) {
+		if (menuOpen && mode != Settings::kHidden && !isConsoleOpen) {
 			continue;
 		}
 
@@ -1100,6 +1102,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	}
 
 	const bool menuOpen = ShouldHideHUD();
+	const bool isConsoleOpen = ui->IsMenuOpen(RE::Console::MENU_NAME);
 
 	// Use already calculated fading alphas
 	const float interiorAlpha = menuOpen ? 0.0f : _interiorAlpha;
@@ -1132,9 +1135,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		// Menus active: relinquish control of external menus.
 		// Important for mod-added system menus, and widgets open during vanilla menus.
-		if (menuOpen && mode != Settings::kHidden) {
+		if (menuOpen && mode != Settings::kHidden && !isConsoleOpen) {
 			continue;
 		}
+
 		if (mode == Settings::kIgnored) {
 			continue;
 		}
