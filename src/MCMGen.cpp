@@ -132,7 +132,7 @@ namespace MCMGen
 				config["pages"] = json::array();
 			}
 
-			// 2. Recover persisted paths & Prune dead entries
+			// 2. Prepare Data Sets
 			std::map<std::string, std::string> allPaths;
 
 			// Track IDs present in the previous session's JSON
@@ -150,6 +150,15 @@ namespace MCMGen
 			const auto settings = Settings::GetSingleton();
 			const auto& activePaths = settings->GetSubWidgetPaths();
 
+			// Source Collision Prep:
+			// Build a set of all Source Files currently loaded in memory.
+			// This allows us to detect if a specific SWF has moved to a new ID (e.g. SkyUI reordering).
+			std::unordered_set<std::string> activeSources;
+			for (const auto& path : activePaths) {
+				activeSources.insert(settings->GetWidgetSource(path));
+			}
+
+			// 3. Recover & Prune Existing Entries
 			for (const auto& page : config["pages"]) {
 				std::string pName = page.value("pageDisplayName", "");
 
@@ -201,20 +210,31 @@ namespace MCMGen
 								}
 
 								// Check Validity:
-								// 1. Is it a Vanilla element? (Skip disk check, always valid)
 								bool isVanilla = hardcodedVanillaPaths.contains(rawID);
-
-								// 2. Is it in active memory? (Currently loaded)
 								bool existsInMemory = activePaths.contains(rawID);
 
-								// 3. Does the file exist? (Check BSResource)
-								// Only run if not Vanilla to avoid checking "Internal/Vanilla" strings against the filesystem.
-								bool existsOnDisk = false;
-								if (!isVanilla) {
-									existsOnDisk = WidgetSourceExists(sourceStr);
+								// Source Collision Logic:
+								// If the source file is currently loaded in memory (activeSources),
+								// BUT this specific ID (rawID) is NOT in memory, it implies this ID is stale.
+								// This catches:
+								// 1. SkyUI Widget Position Jostling (WidgetContainer.5 moved to WidgetContainer.3)
+								// 2. Versioned IDs (Menu_v1 replaced by Menu_v2)
+								bool isStaleID = !existsInMemory && activeSources.contains(sourceStr);
+
+								bool shouldKeep = false;
+
+								if (existsInMemory || isVanilla) {
+									shouldKeep = true;
+								} else if (isStaleID) {
+									// It's definitely dead. The file is loaded elsewhere, so this specific ID is invalid.
+									shouldKeep = false;
+								} else {
+									// The source isn't loaded at all (Menu is closed).
+									// Fall back to physical file check via BSResources.
+									shouldKeep = WidgetSourceExists(sourceStr);
 								}
 
-								if (isVanilla || existsInMemory || existsOnDisk) {
+								if (shouldKeep) {
 									allPaths[rawID] = sourceStr;
 								} else {
 									logger::info("Pruning uninstalled widget: {} (Source: {})", rawID, sourceStr);
@@ -225,7 +245,7 @@ namespace MCMGen
 				}
 			}
 
-			// Merge in new runtime discovery data
+			// 4. Merge New Discoveries
 			bool foundNewWidgetInJson = false;
 			auto memPaths = settings->GetSubWidgetPaths();
 
@@ -243,7 +263,7 @@ namespace MCMGen
 				}
 			}
 
-			// 3. Generate Content for "HUD Elements" Page
+			// 5. Generate Content for "HUD Elements" Page
 			std::vector<ElementSortEntry> validElements;
 			std::unordered_set<std::string> processedPaths;
 
@@ -289,7 +309,7 @@ namespace MCMGen
 				elementsJsonList.push_back(entry.data);
 			}
 
-			// 4. Generate Content for "Widgets" Page (Dynamic)
+			// 6. Generate Content for "Widgets" Page (Dynamic)
 			std::map<std::string, std::vector<WidgetInfo>> groupedWidgets;
 			for (const auto& [path, source] : allPaths) {
 				if (processedPaths.contains(path)) {
@@ -331,7 +351,7 @@ namespace MCMGen
 				}
 			}
 
-			// 5. Calculate Status Flags
+			// 7. Calculate Status Flags
 			// If new content is discovered during Initial/Mid Scans (!Runtime),
 			// we flag the session to display the "Restart Required" warning.
 			// Once Runtime is set (post-Mid Scan), we stop triggering this flag
@@ -342,7 +362,7 @@ namespace MCMGen
 				}
 			}
 
-			// 6. Inject JSON Content
+			// 8. Inject JSON Content
 			json* widgetsContent = nullptr;
 			json* elementsContent = nullptr;
 
@@ -385,7 +405,7 @@ namespace MCMGen
 				}
 			}
 
-			// 7. Write to Disk
+			// 9. Write to Disk
 			if (config != originalConfig) {
 				std::ofstream outFile(configPath, std::ios::trunc);
 				if (outFile.is_open()) {
