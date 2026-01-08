@@ -1064,14 +1064,14 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
 			continue;
 		}
+
 		RE::GFxValue::DisplayInfo dInfo;
 		elem.GetDisplayInfo(&dInfo);
 
-		// Handle reset for ignored widgets.
+		// Handle passive ignore for dynamic widgets.
 		if (mode == Settings::kIgnored) {
-			if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
+			if (!dInfo.GetVisible()) {
 				dInfo.SetVisible(true);
-				dInfo.SetAlpha(100.0);
 				elem.SetDisplayInfo(dInfo);
 			}
 			continue;
@@ -1155,15 +1155,26 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			continue;
 		}
 
-		if (mode == Settings::kIgnored) {
-			continue;
-		}
-
 		RE::GFxValue root;
 		if (!entry.menu->uiMovie->GetVariable(&root, "_root")) {
 			continue;
 		}
+
 		RE::GFxValue::DisplayInfo dInfo;
+
+		// Handle passive ignore for external menus.
+		if (mode == Settings::kIgnored) {
+			// Read current state to see if repair is needed
+			root.GetDisplayInfo(&dInfo);
+
+			if (!dInfo.GetVisible()) {
+				dInfo.SetVisible(true);
+				root.SetDisplayInfo(dInfo);
+			}
+			continue;
+		}
+
+		// For other modes, we set the target alpha blindly
 		if (mode == Settings::kVisible) {
 			dInfo.SetAlpha(100.0);
 		} else if (mode == Settings::kHidden) {
