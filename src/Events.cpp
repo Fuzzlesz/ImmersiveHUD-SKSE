@@ -134,32 +134,16 @@ namespace Events
 		if (a_event->opening && a_event->menuName == RE::MainMenu::MENU_NAME) {
 			// Reset the runtime flag here.
 			// This ensures that if the user Quits to Menu and starts a new game,
-			// the Fader scan (Step 2) will trigger again for the new session.
+			// the Mid Scan (Step 2) will trigger again for the new session.
 			HUDManager::GetSingleton()->ResetSession();
 			HUDManager::GetSingleton()->ScanForWidgets(false, false, false);
 			logger::info("Main menu scan complete.");
 		}
 
-		// 2. Second Scan - Fader Menu closes
-		// Captures late-loading widgets when it's still possible to
-		// visually upate the MCM with our status.
-		if (!a_event->opening && a_event->menuName == RE::FaderMenu::MENU_NAME) {
-			if (!HUDManager::GetSingleton()->IsRuntime()) {
-				HUDManager::GetSingleton()->ScanForWidgets(false, false, false);
-				logger::info("Fader menu scan complete.");
-			}
-		}
-
-		// 3. Runtime Start - HUD Menu opens
-		// This is for SkyUI widgets, or mods that only appear/load during gameplay.
-		// We're doing period scans from this point onward.
+		// 2. Mid Scan / Runtime Start - HUD Menu opens
+		// ScanIfReady handles the transition from Mid Scan -> Runtime internally.
 		if (a_event->opening && a_event->menuName == RE::HUDMenu::MENU_NAME) {
-			auto hudMgr = HUDManager::GetSingleton();
-			if (!hudMgr->IsRuntime()) {
-				hudMgr->StartRuntime();
-				hudMgr->Reset(true);
-				logger::info("HUD Menu opened, runtime scans begin.");
-			}
+			HUDManager::GetSingleton()->ScanIfReady();
 		}
 
 		// -----------------------------------------------------------------

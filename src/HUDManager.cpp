@@ -180,16 +180,32 @@ void HUDManager::ScanIfReady()
 	if (_hasScanned || _isScanPending) {
 		return;
 	}
+
 	auto* ui = RE::UI::GetSingleton();
 	if (ui && ui->GetMenu("HUD Menu")) {
 		_isScanPending = true;
 
-		// Session initial scan: capture runtime status then flip scanned flag
+		// Snapshot state to determine if this is the transition from
+		// Main Menu -> Mid Scan or a generic periodic rescan.
+		const bool isMidScan = !_isRuntime;
+
+		// Flip flag immediately to prevent update loop from triggering multiple tasks
 		_hasScanned = true;
 
-		SKSE::GetTaskInterface()->AddUITask([this]() {
-			// Routine scan (Runtime=true, Deep=true)
-			ScanForWidgets(false, true, true);
+		SKSE::GetTaskInterface()->AddUITask([this, isMidScan]() {
+			// Run Scan.
+			// If this is the mid scan, we pass 'false' for a_isRuntime.
+			// This captures the "early" late-loaders while we're still able to edit MCM status.
+			ScanForWidgets(false, true, !isMidScan);
+
+			// Start Runtime.
+			// If we just finished the mid scan, we begin the runtime state.
+			if (isMidScan) {
+				StartRuntime();
+				Reset(true);
+				logger::info("Mid scan complete. Runtime started.");
+			}
+
 			_isScanPending = false;
 		});
 	}
