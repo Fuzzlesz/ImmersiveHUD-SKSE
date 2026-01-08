@@ -91,6 +91,14 @@ namespace MCMGen
 		json data;
 	};
 
+	// Helper to track settings that might be lost due to ID changes
+	struct OrphanSetting
+	{
+		std::string id;
+		std::string source;
+		long value;
+	};
+
 	// ==========================================
 	// Main Update Loop
 	// ==========================================
@@ -138,6 +146,10 @@ namespace MCMGen
 			// Track IDs present in the previous session's JSON
 			std::unordered_set<std::string> previousJsonIDs;
 
+			// Harvest potential orphans (current settings in the JSON)
+			// We map Source -> List of Orphans
+			std::map<std::string, std::vector<OrphanSetting>> potentialOrphans;
+
 			// Lookup set for Hardcoded/Vanilla paths to prevent flagging them as "New"
 			std::unordered_set<std::string> hardcodedVanillaPaths;
 			for (const auto& def : HUDElements::Get()) {
@@ -167,6 +179,8 @@ namespace MCMGen
 					for (const auto& item : page["content"]) {
 						if (item.contains("help")) {
 							std::string help = item["help"].get<std::string>();
+							std::string idStr = item["id"].get<std::string>();  // e.g. "iMode_Foo:Widgets"
+
 							std::string sourceStr = "Unknown";
 							std::string rawID = "";
 
@@ -192,6 +206,16 @@ namespace MCMGen
 
 							if (!rawID.empty()) {
 								previousJsonIDs.insert(rawID);
+
+								// Harvest Orphan Candidate
+								// We grab the INI key from the JSON ID (strip ":Widgets")
+								std::string iniKey = idStr.substr(0, idStr.find(':'));
+								long val = ini.GetLongValue("Widgets", iniKey.c_str(), -1);
+
+								// Only store if it's a valid, non-default setting (1=Immersive is default)
+								if (val != -1 && val != 1) {
+									potentialOrphans[sourceStr].push_back({ rawID, sourceStr, val });
+								}
 
 								std::string lowerSrc = sourceStr;
 								std::transform(lowerSrc.begin(), lowerSrc.end(), lowerSrc.begin(), ::tolower);
@@ -340,11 +364,40 @@ namespace MCMGen
 					std::string iniKey = "iMode_" + safeID;
 					std::string help = "Source: " + w.source + "\nID: " + w.rawPath;
 
-					if (iniLoaded) {
-						if (ini.GetValue("Widgets", iniKey.c_str(), nullptr) == nullptr) {
-							newIniKeysWidgets.push_back(iniKey);
+					// Check INI state
+					bool existsInIni = iniLoaded && (ini.GetValue("Widgets", iniKey.c_str(), nullptr) != nullptr);
+
+					if (!existsInIni) {
+						// SETTING MIGRATION:
+						// If this is a new key, check if we have a valid orphan for this source.
+						// For SkyUI widgets shifting container positions, and mod authors versioning their names.
+						auto& orphans = potentialOrphans[w.source];
+
+						// Filter orphans: ensure we only look at orphans that were ACTUALLY pruned.
+						// (i.e., their ID is NOT in allPaths).
+						// We iterate backwards to find a match to pop.
+						long migratedValue = -1;
+						for (auto it = orphans.begin(); it != orphans.end();) {
+							if (allPaths.find(it->id) == allPaths.end()) {
+								// This orphan is dead. Adopt its value.
+								migratedValue = it->value;
+								orphans.erase(it);  // Remove so it isn't used twice
+								break;
+							} else {
+								++it;
+							}
 						}
-					} else {
+
+						if (migratedValue != -1) {
+							// Found a match! Write it immediately so it doesn't get overwritten by defaults.
+							ini.SetLongValue("Widgets", iniKey.c_str(), migratedValue);
+							logger::info("Migrated setting for {}: {} -> {}", displayName, w.source, migratedValue);
+							// Mark as existing so we don't add to newIniKeysWidgets (which writes default 1)
+							existsInIni = true;
+						}
+					}
+
+					if (!existsInIni) {
 						newIniKeysWidgets.push_back(iniKey);
 					}
 					finalWidgetsMap[finalID] = CreateEnum(displayName, finalID, help);
@@ -418,6 +471,8 @@ namespace MCMGen
 			if (iniLoaded || !fs::exists(iniPath)) {
 				SmartAppendIni(newIniKeysWidgets, "Widgets", iniPath, ini);
 				SmartAppendIni(newIniKeysElements, "HUDElements", iniPath, ini);
+
+				ini.SaveFile(iniPath.string().c_str());
 			}
 
 		} catch (...) {
