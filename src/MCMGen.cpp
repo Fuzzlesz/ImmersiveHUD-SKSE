@@ -346,9 +346,9 @@ bool WidgetSourceExists(const std::string& a_source)
 			}
 
 			// 5. Calculate Status Flags
-			// If new content is discovered during Initial Scans (!Runtime),
+			// If new content is discovered during Initial/Mid Scans (!Runtime),
 			// we flag the session to display the "Restart Required" warning.
-			// Once Runtime is set (After HUD Menu Loaded), we stop triggering this flag
+			// Once Runtime is set (post-Mid Scan), we stop triggering this flag
 			// as the MCM page cannot visually update, which would lead to stale messages.
 			if (!a_isRuntime) {
 				if (!newIniKeysElements.empty() || !newIniKeysWidgets.empty() || foundNewWidgetInJson) {

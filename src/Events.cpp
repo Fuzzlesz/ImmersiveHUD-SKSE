@@ -162,12 +162,8 @@ namespace Events
 			if (Utils::IsSystemMenu(menuName)) {
 				HUDManager::GetSingleton()->Reset(false);
 			}
-			// 2. Force scan when HUD opens
-			else if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
-				HUDManager::GetSingleton()->ScanIfReady();
-			}
-			// 3. Catch widgets appearing late
-			else {
+			// 2. Catch widgets appearing late
+			else if (a_event->menuName != RE::HUDMenu::MENU_NAME) {
 				HUDManager::GetSingleton()->RegisterNewMenu();
 			}
 		}

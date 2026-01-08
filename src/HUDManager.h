@@ -27,7 +27,6 @@ public:
 
 	// Status Getters
 	[[nodiscard]] bool IsSkyHUDActive() const { return _isSkyHUDActive; }
-	[[nodiscard]] bool IsRuntime() const { return _isRuntime; }
 
 	// Session State
 	void ResetSession();
