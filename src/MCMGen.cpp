@@ -11,42 +11,14 @@ namespace MCMGen
 {
 	static bool _iniModifiedThisSession = false;
 
-bool WidgetSourceExists(const std::string& a_source)
+	// ==========================================
+	// Utility Helpers
+	// ==========================================
+
+	bool WidgetSourceExists(const std::string& a_source)
 	{
-		if (a_source.empty() || a_source == "Unknown") {
-			return true;
-		}
-
-		// 1. Clean and Normalize Path
-		std::string path = a_source;
-		if (path.starts_with("file:///")) {
-			path = path.substr(8);
-		}
-		std::replace(path.begin(), path.end(), '|', ':');
-		std::replace(path.begin(), path.end(), '\\', '/');
-
-		std::string lowerPath = path;
-		std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
-
-		// 2. Internal / Vanilla Components
-		if (lowerPath.starts_with("internal/") || lowerPath.find("hudmenu") != std::string::npos) {
-			return true;
-		}
-
-		// 3. Loose File Check
-		std::error_code ec;
-		if (fs::exists(fs::path("Data") / path, ec)) {
-			return true;
-		}
-
-		// 4. SkyUI Widget Check
-		// This protects widgets in BSAs or not currently loaded in memory when check runs.
-		if (lowerPath.find("widgets/") != std::string::npos ||
-			lowerPath.find("/skyui/") != std::string::npos) {
-			return true;
-		}
-
-		return false;
+		RE::BSResourceNiBinaryStream stream(a_source);
+		return stream.good();
 	}
 
 	json CreateEnum(const std::string& a_text, const std::string& a_id, const std::string& a_help)
@@ -118,6 +90,10 @@ bool WidgetSourceExists(const std::string& a_source)
 		std::string sortKey;
 		json data;
 	};
+
+	// ==========================================
+	// Main Update Loop
+	// ==========================================
 
 	void Update(bool a_isRuntime, bool a_widgetsPopulated)
 	{
@@ -224,11 +200,21 @@ bool WidgetSourceExists(const std::string& a_source)
 									continue;
 								}
 
-								// Check: Persistence validity (Disk presence or active memory).
-								bool existsOnDisk = WidgetSourceExists(sourceStr);
+								// Check Validity:
+								// 1. Is it a Vanilla element? (Skip disk check, always valid)
+								bool isVanilla = hardcodedVanillaPaths.contains(rawID);
+
+								// 2. Is it in active memory? (Currently loaded)
 								bool existsInMemory = activePaths.contains(rawID);
 
-								if (existsOnDisk || existsInMemory) {
+								// 3. Does the file exist? (Check BSResource)
+								// Only run if not Vanilla to avoid checking "Internal/Vanilla" strings against the filesystem.
+								bool existsOnDisk = false;
+								if (!isVanilla) {
+									existsOnDisk = WidgetSourceExists(sourceStr);
+								}
+
+								if (isVanilla || existsInMemory || existsOnDisk) {
 									allPaths[rawID] = sourceStr;
 								} else {
 									logger::info("Pruning uninstalled widget: {} (Source: {})", rawID, sourceStr);
