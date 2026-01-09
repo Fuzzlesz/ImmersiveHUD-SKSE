@@ -828,6 +828,37 @@ void HUDManager::DumpHUDStructure()
 }
 
 // ==========================================
+// Ignored Visibility Helper
+// ==========================================
+
+void HUDManager::EnforceIgnoredVisibility(RE::GFxValue& a_target)
+{
+	RE::GFxValue::DisplayInfo dInfo;
+	a_target.GetDisplayInfo(&dInfo);
+
+	bool changed = false;
+
+	// 1. Ensure the element is flagged as Visible
+	if (!dInfo.GetVisible()) {
+		dInfo.SetVisible(true);
+		changed = true;
+	}
+
+	// 2. Alpha Correction
+	// If a widget is effectively invisible (Alpha ~0) despite being flagged "Visible",
+	// force it to 100. We use a low threshold to avoid overriding intended
+	// partial transparency (e.g., a widget that is naturally 50% opacity).
+	if (dInfo.GetAlpha() < 1.0) {
+		dInfo.SetAlpha(100.0);
+		changed = true;
+	}
+
+	if (changed) {
+		a_target.SetDisplayInfo(dInfo);
+	}
+}
+
+// ==========================================
 // HUD Application
 // ==========================================
 
@@ -1081,17 +1112,14 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			continue;
 		}
 
-		RE::GFxValue::DisplayInfo dInfo;
-		elem.GetDisplayInfo(&dInfo);
-
 		// Handle passive ignore for dynamic widgets.
 		if (mode == Settings::kIgnored) {
-			if (!dInfo.GetVisible()) {
-				dInfo.SetVisible(true);
-				elem.SetDisplayInfo(dInfo);
-			}
+			EnforceIgnoredVisibility(elem);
 			continue;
 		}
+
+		RE::GFxValue::DisplayInfo dInfo;
+		elem.GetDisplayInfo(&dInfo);
 
 		if (mode == Settings::kHidden) {
 			dInfo.SetVisible(false);
@@ -1176,21 +1204,14 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			continue;
 		}
 
-		RE::GFxValue::DisplayInfo dInfo;
-
 		// Handle passive ignore for external menus.
 		if (mode == Settings::kIgnored) {
-			// Read current state to see if repair is needed
-			root.GetDisplayInfo(&dInfo);
-
-			if (!dInfo.GetVisible()) {
-				dInfo.SetVisible(true);
-				root.SetDisplayInfo(dInfo);
-			}
+			EnforceIgnoredVisibility(root);
 			continue;
 		}
 
 		// For other modes, we set the target alpha blindly
+		RE::GFxValue::DisplayInfo dInfo;
 		if (mode == Settings::kVisible) {
 			dInfo.SetAlpha(100.0);
 		} else if (mode == Settings::kHidden) {

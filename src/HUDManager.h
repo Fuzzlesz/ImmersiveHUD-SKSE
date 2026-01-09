@@ -50,6 +50,7 @@ private:
 	// Child Visibility Enforcement
 	void EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePermanent = false);
 	void EnforceEnchantMeterVisible(RE::GFxValue& a_parent);
+	void EnforceIgnoredVisibility(RE::GFxValue& a_target);
 
 	// Internal Scanning Logic
 	void ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount, bool& a_changes);
