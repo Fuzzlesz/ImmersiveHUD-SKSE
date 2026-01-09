@@ -261,7 +261,7 @@ namespace MCMGen
 								if (shouldKeep) {
 									allPaths[rawID] = sourceStr;
 								} else {
-									logger::info("Pruning uninstalled widget: {} (Source: {})", rawID, sourceStr);
+									logger::info("Pruning uninstalled widget: {} [Source: {}]", rawID, sourceStr);
 								}
 							}
 						}
