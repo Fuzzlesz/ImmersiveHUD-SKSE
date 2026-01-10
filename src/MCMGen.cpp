@@ -174,8 +174,8 @@ namespace MCMGen
 			for (const auto& page : config["pages"]) {
 				std::string pName = page.value("pageDisplayName", "");
 
-				// Scan both Widget and Element pages to recover IDs
-				if ((pName == "$fzIH_PageWidgets" || pName == "$fzIH_PageElements") && page.contains("content")) {
+				// Scan both Widget page to recover IDs
+				if (pName == "$fzIH_PageWidgets" && page.contains("content")) {
 					for (const auto& item : page["content"]) {
 						if (item.contains("help")) {
 							std::string help = item["help"].get<std::string>();
