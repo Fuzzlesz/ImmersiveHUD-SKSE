@@ -237,6 +237,10 @@ namespace MCMGen
 								bool isVanilla = hardcodedVanillaPaths.contains(rawID);
 								bool existsInMemory = activePaths.contains(rawID);
 
+								// Identify if this is a System Menu that should be pruned (e.g. Fader Menu)
+								// Fader Menu is explicitly checked because Utils::IsSystemMenu excludes it for logic reasons elsewhere.
+								bool isSystemMenu = (rawID == "Fader Menu" || Utils::IsSystemMenu(rawID));
+
 								// Source Collision Logic:
 								// If the source file is currently loaded in memory (activeSources),
 								// BUT this specific ID (rawID) is NOT in memory, it implies this ID is stale.
@@ -263,6 +267,9 @@ namespace MCMGen
 
 								if (existsInMemory || isVanilla) {
 									shouldKeep = true;
+								} else if (isSystemMenu) {
+									shouldKeep = false;
+									logger::info("Pruning system menu from config: {}", rawID);
 								} else if (isInteractivePrune) {
 									shouldKeep = false;
 									logger::info("Pruning interactive menu from config: {}", rawID);
