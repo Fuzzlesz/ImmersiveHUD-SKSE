@@ -87,6 +87,7 @@ private:
 	float _timer = 0.0f;
 	float _scanTimer = 0.0f;
 	float _displayTimer = 0.0f;
+	float _lastShoutMeterFixTime = 0.0f;
 
 	// Stealth State Tracker
 	float _lastDetectionLevel = 0.0f;

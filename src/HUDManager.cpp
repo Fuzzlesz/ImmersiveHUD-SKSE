@@ -155,6 +155,7 @@ void HUDManager::Reset(bool a_refreshUserPreference)
 	_scanTimer = 0.0f;
 	_displayTimer = 0.0f;
 	_lastDetectionLevel = 0.0f;
+	_lastShoutMeterFixTime = 0.0f;
 
 	// Call Update with 0 delta to calculate state and snap UI immediately.
 	// This eliminates delay/flicker when coming out of load screens or menus.
@@ -926,8 +927,43 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				continue;
 			}
 
+			// We need display info to determine if we should even attempt Z-Order fixing
 			RE::GFxValue::DisplayInfo dInfo;
 			elem.GetDisplayInfo(&dInfo);
+
+			// Shout Meter Z-Order Fix for Infinity UI/Compass Navigation Overhaul
+			// We ensure the visible shout meter stays on top of the compass.
+			// The timer prevents checking every single frame, but aggressive enough to catch updates.
+			// We only fix elements that are currently VISIBLE, otherwise we might
+			// swap a hidden vanilla meter with the compass and mess up the hierarchy.
+			if (isShoutMeter && dInfo.GetVisible()) {
+				if (_timer > _lastShoutMeterFixTime + 2.0f || (_timer - _lastShoutMeterFixTime) < 0.1f) {
+					// Only update the timer on the very first element we process in this frame
+					if (_timer > _lastShoutMeterFixTime + 2.0f) {
+						_lastShoutMeterFixTime = _timer;
+					}
+
+					RE::GFxValue parent;
+					RE::GFxValue compass;
+					if (elem.GetMember("_parent", &parent) && parent.GetMember("Compass", &compass) && compass.IsDisplayObject()) {
+						RE::GFxValue shoutDepthVal, compassDepthVal;
+						elem.Invoke("getDepth", &shoutDepthVal, nullptr, 0);
+						compass.Invoke("getDepth", &compassDepthVal, nullptr, 0);
+
+						if (shoutDepthVal.IsNumber() && compassDepthVal.IsNumber()) {
+							double sDepth = shoutDepthVal.GetNumber();
+							double cDepth = compassDepthVal.GetNumber();
+
+							// If Shout is below Compass, Swap them.
+							if (sDepth < cDepth) {
+								RE::GFxValue args[] = { compass };
+								elem.Invoke("swapDepths", nullptr, args, 1);
+								logger::info("Fixed Shout Meter Z-Order. [Shout: {} < Compass: {}]", sDepth, cDepth);
+							}
+						}
+					}
+				}
+			}
 
 			// Mutual Exclusion: SkyHUD Combined mode vs Vanilla Left/Right
 			if ((_isSkyHUDActive && (isEnchantLeft || isEnchantRight)) || (!_isSkyHUDActive && isEnchantSkyHUD)) {
@@ -997,8 +1033,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			// Handle reset for other ignored elements
 			if (mode == Settings::kIgnored) {
-				// For Compass/ShoutMeter, we must respect the external "Visible" state.
-				// If it's hidden, it's likely the inactive SkyHUD variant. Don't force it to show.
+				// For Compass/ShoutMeter, we must respect the external "Visible" state (Vanilla vs Alt).
+				// If it's hidden, it's likely the inactive variant. Don't force it to show.
 				if ((isCompass || isShoutMeter) && !dInfo.GetVisible()) {
 					continue;
 				}
