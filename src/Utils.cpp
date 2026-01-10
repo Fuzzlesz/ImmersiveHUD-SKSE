@@ -89,15 +89,9 @@ namespace Utils
 
 	std::string GetWidgetDisplayName(const std::string& a_source)
 	{
-		// 1. Extract the clean name from the Source URL (e.g., "meter.swf" -> "Meter").
+		// Extract the clean name from the Source URL (e.g., "meter.swf" -> "Meter").
 		// We rely on the fact that ScanArrayContainer and GetMenuURL ensure a_source is never empty.
 		std::string name = ExtractFilename(a_source);
-
-		// 2. Final safety check (Just in case ExtractFilename results in an empty string).
-		if (name.empty()) {
-			return "Unknown Widget";
-		}
-
 		return name;
 	}
 
