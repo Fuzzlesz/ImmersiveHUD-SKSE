@@ -146,8 +146,7 @@ namespace Utils
 		return flags.any(
 			Flag::kPausesGame,
 			Flag::kUsesCursor,
-			Flag::kUsesMenuContext,
-			Flag::kHasButtonBar);
+			Flag::kUsesMenuContext);
 	}
 
 	void RegisterInteractiveSource(const std::string& a_source)
@@ -184,10 +183,10 @@ namespace Utils
 			activeFlags.push_back("UsesCursor");
 		if (flags.all(Flag::kUsesMenuContext))
 			activeFlags.push_back("UsesMenuContext");
-		if (flags.all(Flag::kHasButtonBar))
-			activeFlags.push_back("HasButtonBar");
 
 		// Secondary flags (Informational)
+		if (flags.all(Flag::kHasButtonBar))
+			activeFlags.push_back("HasButtonBar");
 		if (flags.all(Flag::kAlwaysOpen))
 			activeFlags.push_back("AlwaysOpen");
 		if (flags.all(Flag::kModal))
