@@ -905,6 +905,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	for (const auto& def : HUDElements::Get()) {
 		bool isCompass = (strcmp(def.id, "iMode_Compass") == 0);
+		bool isShoutMeter = (strcmp(def.id, "iMode_ShoutMeter") == 0);
 		bool isStealthMeter = (strcmp(def.id, "iMode_StealthMeter") == 0);
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
@@ -996,8 +997,17 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			// Handle reset for other ignored elements
 			if (mode == Settings::kIgnored) {
+				// For Compass/ShoutMeter, we must respect the external "Visible" state.
+				// If it's hidden, it's likely the inactive SkyHUD variant. Don't force it to show.
+				if ((isCompass || isShoutMeter) && !dInfo.GetVisible()) {
+					continue;
+				}
+
 				if (!dInfo.GetVisible() || dInfo.GetAlpha() < 100.0) {
-					dInfo.SetVisible(true);
+					// Only force Visible=True if it's NOT a compass/shout element
+					if (!isCompass && !isShoutMeter) {
+						dInfo.SetVisible(true);
+					}
 					dInfo.SetAlpha(100.0);
 					elem.SetDisplayInfo(dInfo);
 				}
@@ -1048,10 +1058,10 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				}
 			}
 
-			// For Compass sub-components, we MUST NOT touch the _visible property.
+			// For Compass AND Shout Meter sub-components, we MUST NOT touch the _visible property.
 			// SkyHUD hides the vanilla frame and shows the Alt frame via _visible.
 			// If we force SetVisible(true), we show both. We rely on Alpha to hide.
-			if (!isCompass) {
+			if (!isCompass && !isShoutMeter) {
 				dInfo.SetVisible(shouldBeVisible);
 			}
 			dInfo.SetAlpha(targetAlpha);

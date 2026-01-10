@@ -62,6 +62,13 @@ namespace HUDElements
 				"_root.HUDMovieBaseInstance.MagickaMeter"
 			}, false },
 
+			{ "iMode_ShoutMeter", "$fzIH_ElemShout", {
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.ShoutMeterInstance",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.ShoutWarningInstance",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.ShoutMeterBarAlt",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.ShoutWarningInstanceAlt"
+			}, false },
+
 			{ "iMode_Stamina", "$fzIH_ElemStamina", {
 				"_root.HUDMovieBaseInstance.Stamina",
 				"_root.HUDMovieBaseInstance.StaminaMeter"
