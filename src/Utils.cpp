@@ -102,15 +102,14 @@ namespace Utils
 	{
 		// Fader Menu excluded to preserve vanilla fade timing
 		static const std::unordered_set<std::string> systemMenus = {
-			"LevelUp Menu", "Credits Menu", "TitleSequence Menu",
-			"Dialogue Menu", "Lockpicking Menu", "Creation Club Menu", "LoadWaitSpinner",
-			"MessageBoxMenu", "Cursor Menu", "Loading Menu", "Console",
-			"Training Menu", "Mist Menu", "Kinect Menu", "TweenMenu",
-			"BarterMenu", "Mod Manager Menu", "Journal Menu", "Tutorial Menu",
-			"SafeZoneMenu", "MapMenu", "Sleep/Wait Menu", "Console Native UI Menu",
-			"Book Menu", "FavoritesMenu", "GiftMenu", "MagicMenu",
-			"Crafting Menu", "ContainerMenu", "Main Menu", "InventoryMenu",
-			"RaceSex Menu"
+			"BarterMenu", "Book Menu", "Console", "Console Native UI Menu",
+			"ContainerMenu", "Crafting Menu", "Creation Club Menu", "Credits Menu",
+			"Cursor Menu", "Dialogue Menu", "FavoritesMenu", "GiftMenu",
+			"InventoryMenu", "Journal Menu", "Kinect Menu", "LevelUp Menu",
+			"Loading Menu", "LoadWaitSpinner", "Lockpicking Menu", "MagicMenu",
+			"Main Menu", "MapMenu", "MessageBoxMenu", "Mist Menu",
+			"Mod Manager Menu", "RaceSex Menu", "SafeZoneMenu", "Sleep/Wait Menu",
+			"TitleSequence Menu", "Training Menu", "Tutorial Menu", "TweenMenu"
 		};
 		return systemMenus.contains(a_menuName);
 	}
@@ -185,32 +184,32 @@ namespace Utils
 			activeFlags.push_back("UsesMenuContext");
 
 		// Secondary flags (Informational)
-		if (flags.all(Flag::kHasButtonBar))
-			activeFlags.push_back("HasButtonBar");
-		if (flags.all(Flag::kAlwaysOpen))
-			activeFlags.push_back("AlwaysOpen");
-		if (flags.all(Flag::kModal))
-			activeFlags.push_back("Modal");
-		if (flags.all(Flag::kInventoryItemMenu))
-			activeFlags.push_back("InventoryItemMenu");
-		if (flags.all(Flag::kCustomRendering))
-			activeFlags.push_back("CustomRendering");
-		if (flags.all(Flag::kApplicationMenu))
-			activeFlags.push_back("ApplicationMenu");
-		if (flags.all(Flag::kRendersOffscreenTargets))
-			activeFlags.push_back("RendersOffscreen");
-		if (flags.all(Flag::kUsesMovementToDirection))
-			activeFlags.push_back("UsesMovementToDirection");
-		if (flags.all(Flag::kDisablePauseMenu))
-			activeFlags.push_back("DisablePauseMenu");
 		if (flags.all(Flag::kAllowSaving))
 			activeFlags.push_back("AllowSaving");
-		if (flags.all(Flag::kTopmostRenderedMenu))
-			activeFlags.push_back("Topmost");
+		if (flags.all(Flag::kAlwaysOpen))
+			activeFlags.push_back("AlwaysOpen");
+		if (flags.all(Flag::kApplicationMenu))
+			activeFlags.push_back("ApplicationMenu");
 		if (flags.all(Flag::kAssignCursorToRenderer))
 			activeFlags.push_back("AssignCursorToRenderer");
+		if (flags.all(Flag::kCustomRendering))
+			activeFlags.push_back("CustomRendering");
+		if (flags.all(Flag::kDisablePauseMenu))
+			activeFlags.push_back("DisablePauseMenu");
+		if (flags.all(Flag::kHasButtonBar))
+			activeFlags.push_back("HasButtonBar");
+		if (flags.all(Flag::kInventoryItemMenu))
+			activeFlags.push_back("InventoryItemMenu");
+		if (flags.all(Flag::kModal))
+			activeFlags.push_back("Modal");
+		if (flags.all(Flag::kRendersOffscreenTargets))
+			activeFlags.push_back("RendersOffscreen");
 		if (flags.all(Flag::kRendersUnderPauseMenu))
 			activeFlags.push_back("RendersUnderPauseMenu");
+		if (flags.all(Flag::kTopmostRenderedMenu))
+			activeFlags.push_back("Topmost");
+		if (flags.all(Flag::kUsesMovementToDirection))
+			activeFlags.push_back("UsesMovementToDirection");
 
 		if (activeFlags.empty()) {
 			return "None";
