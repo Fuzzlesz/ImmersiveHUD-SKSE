@@ -946,40 +946,10 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 			// Stealth Meter Handling (Unified Logic)
 			if (isStealthMeter) {
-				if (mode == Settings::kIgnored) {
-					// Manual Vanilla Authority
-					float finalAlpha = _ctxSneakAlpha;
-
-					// Apply Pulse logic (Ensures vanilla mode still breathes when detected)
-					if (isSneaking && _lastDetectionLevel > 0.1f && finalAlpha > 0.01f) {
-						constexpr float kPulseRange = 0.05f;
-						constexpr float kPulseFreq = 0.05f;
-						auto detectionFreq = (_lastDetectionLevel / 200.0f) + 0.5f;
-						auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
-						finalAlpha *= std::min(static_cast<float>(pulse), 1.0f);
-					}
-
-					bool finalVisible = (finalAlpha > 0.1f) && !menuOpen;
-					dInfo.SetVisible(finalVisible);
-					dInfo.SetAlpha(finalAlpha);
-					elem.SetDisplayInfo(dInfo);
-
-					// Sync sub-clips
-					const char* subPaths[] = { "SneakAnimInstance", "SneakTextHolder" };
-					for (auto p : subPaths) {
-						RE::GFxValue sub;
-						if (elem.GetMember(p, &sub) && sub.IsDisplayObject()) {
-							RE::GFxValue::DisplayInfo sd;
-							sd.SetVisible(finalVisible);
-							sd.SetAlpha(finalAlpha);
-							sub.SetDisplayInfo(sd);
-						}
-					}
-					continue;
-				}
-
 				// Managed/Contextual Authority
 				float finalAlpha = _ctxSneakAlpha;
+
+				// Apply Pulse logic (Ensures vanilla mode still breathes when detected)
 				if (settings->GetSneakMeterSettings().enabled && isSneaking && _lastDetectionLevel > 0.1f && finalAlpha > 0.01f) {
 					constexpr float kPulseRange = 0.05f;
 					constexpr float kPulseFreq = 0.05f;
@@ -988,10 +958,11 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					finalAlpha *= std::min(static_cast<float>(pulse), 1.0f);
 				}
 
-				double targetAlpha = finalAlpha;
-				bool shouldBeVisible = (targetAlpha > 0.1f) && !menuOpen;
-				dInfo.SetVisible(shouldBeVisible);
-				dInfo.SetAlpha(targetAlpha);
+				double targetSneakAlpha = finalAlpha;
+				bool sneakVisible = (targetSneakAlpha > 0.1f) && !menuOpen;
+
+				dInfo.SetVisible(sneakVisible);
+				dInfo.SetAlpha(targetSneakAlpha);
 				elem.SetDisplayInfo(dInfo);
 
 				// Clip Injection: override eye/text clips
@@ -1000,8 +971,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					RE::GFxValue sub;
 					if (elem.GetMember(p, &sub) && sub.IsDisplayObject()) {
 						RE::GFxValue::DisplayInfo sd;
-						sd.SetVisible(shouldBeVisible);
-						sd.SetAlpha(targetAlpha);
+						sd.SetVisible(sneakVisible);
+						sd.SetAlpha(targetSneakAlpha);
 						sub.SetDisplayInfo(sd);
 					}
 				}
