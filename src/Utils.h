@@ -24,7 +24,10 @@ namespace Utils
 	// rather than a passive HUD element.
 	bool IsInteractiveMenu(RE::IMenu* a_menu);
 
-	// Log flags
+	// Helper to get a string representation of menu flags (e.g. "PausesGame | UsesCursor")
+	std::string GetMenuFlags(RE::IMenu* a_menu);
+
+	// Log flags (Now uses GetMenuFlags internally)
 	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu);
 
 	// Registry for Interactive Sources (SWF files detected as interactive)

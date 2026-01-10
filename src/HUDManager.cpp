@@ -815,11 +815,14 @@ void HUDManager::DumpHUDStructure()
 	for (auto& [name, entry] : ui->menuMap) {
 		bool isOpen = entry.menu && entry.menu->uiMovie;
 
+		// Get flag strings
+		std::string flags = entry.menu ? Utils::GetMenuFlags(entry.menu.get()) : "None";
+
 		if (isOpen) {
 			std::string src = Utils::GetMenuURL(entry.menu->uiMovie);
-			logger::info("[Menu] [OPEN]   {} [Source: {}]", name.c_str(), src);
+			logger::info("[Menu] [OPEN]   {} [Source: {}] [Flags: {}]", name.c_str(), src, flags);
 		} else {
-			logger::info("[Menu] [CLOSED] {}", name.c_str());
+			logger::info("[Menu] [CLOSED] {} [Flags: {}]", name.c_str(), flags);
 		}
 	}
 

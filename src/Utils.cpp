@@ -173,22 +173,11 @@ namespace Utils
 		return g_interactiveSources.contains(a_source);
 	}
 
-	// Debug logging option
-	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu)
+	std::string GetMenuFlags(RE::IMenu* a_menu)
 	{
-		if (!Settings::GetSingleton()->IsMenuFlagLoggingEnabled()) {
-			return;
+		if (!a_menu) {
+			return "None";
 		}
-
-		if (!a_menu)
-			return;
-
-		// Guard: Only log each menu once per session to prevent spam
-		static std::unordered_set<std::string> _loggedMenus;
-		if (_loggedMenus.contains(a_name)) {
-			return;
-		}
-		_loggedMenus.insert(a_name);
 
 		using Flag = RE::UI_MENU_FLAGS;
 		auto flags = a_menu->menuFlags;
@@ -231,15 +220,39 @@ namespace Utils
 		if (flags.all(Flag::kRendersUnderPauseMenu))
 			activeFlags.push_back("RendersUnderPauseMenu");
 
-		std::string flagStr = activeFlags.empty() ? "None" : "";
+		if (activeFlags.empty()) {
+			return "None";
+		}
+
+		std::string flagStr;
 		for (size_t i = 0; i < activeFlags.size(); ++i) {
 			flagStr += activeFlags[i];
 			if (i < activeFlags.size() - 1)
 				flagStr += " | ";
 		}
+		return flagStr;
+	}
+
+	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu)
+	{
+		// Added check for debug setting
+		if (!Settings::GetSingleton()->IsMenuFlagLoggingEnabled()) {
+			return;
+		}
+
+		if (!a_menu)
+			return;
+
+		// Guard: Only log each menu once per session to prevent spam
+		static std::unordered_set<std::string> _loggedMenus;
+		if (_loggedMenus.contains(a_name)) {
+			return;
+		}
+		_loggedMenus.insert(a_name);
+
+		std::string flagStr = GetMenuFlags(a_menu);
 
 		bool isInteractive = IsInteractiveMenu(a_menu);
-
 		std::string logPrefix = isInteractive ? "Ignoring Interactive Menu" : "Analyzing Menu";
 
 		logger::info("{}: '{}'. Flags: [{}]", logPrefix, a_name, flagStr);
