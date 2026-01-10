@@ -909,6 +909,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isHealth = (strcmp(def.id, "iMode_Health") == 0);
 		bool isMagicka = (strcmp(def.id, "iMode_Magicka") == 0);
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
+		bool isTemperature = (strcmp(def.id, "iMode_Temperature") == 0);
+
 		bool isEnchantLeft, isEnchantRight, isEnchantSkyHUD;
 		bool isEnchantElement = IsEnchantmentElement(def.id, isEnchantLeft, isEnchantRight, isEnchantSkyHUD);
 		bool isResourceBar = isHealth || isMagicka || isStamina;
@@ -1075,7 +1077,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				}
 			}
 
-			dInfo.SetVisible(shouldBeVisible);
+			// For Compass sub-components, we MUST NOT touch the _visible property.
+			// SkyHUD hides the vanilla frame and shows the Alt frame via _visible.
+			// If we force SetVisible(true), we show both. We rely on Alpha to hide.
+			if (!isCompass) {
+				dInfo.SetVisible(shouldBeVisible);
+			}
 			dInfo.SetAlpha(targetAlpha);
 			elem.SetDisplayInfo(dInfo);
 
@@ -1088,6 +1095,14 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 										  mode == Settings::kInCombat || mode == Settings::kNotInCombat ||
 										  mode == Settings::kWeaponDrawn || mode == Settings::kLockedOn);
 					EnforceHMSMeterVisible(elem, forceOverride);
+				} else if (isTemperature) {
+					// Ensure the Temperature Meter CONTAINER stays visible even if the game wants to hide it.
+					// We verify current state first to avoid flickering caused by snapping Alpha.
+					elem.GetDisplayInfo(&dInfo);
+					if (!dInfo.GetVisible()) {
+						dInfo.SetVisible(true);
+						elem.SetDisplayInfo(dInfo);
+					}
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
 				} else if (isEnchantLeft || isEnchantRight) {

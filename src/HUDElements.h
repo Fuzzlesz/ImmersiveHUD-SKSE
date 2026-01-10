@@ -19,8 +19,14 @@ namespace HUDElements
 				"_root.HUDMovieBaseInstance.ArrowInfoInstance"
 			}, false },
 
-			{ "iMode_Compass", "$fzIH_ElemCompass", {
-				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder"
+			{ "iMode_Compass", "$fzIH_ElemCompass", { 
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassFrame",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassFrameAlt",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.DirectionRect",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassRect",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassCard",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassCardAlt",
+				"_root.HUDMovieBaseInstance.CompassShoutMeterHolder.Compass.CompassMask_mc"
 			}, false },
 
 			{ "iMode_Crosshair", "$fzIH_ElemCrosshair", {
@@ -63,6 +69,10 @@ namespace HUDElements
 
 			{ "iMode_StealthMeter", "$fzIH_ElemStealth", {
 				"_root.HUDMovieBaseInstance.StealthMeterInstance"
+			}, false },
+
+			{ "iMode_Temperature", "$fzIH_ElemTemperature", {
+				"_root.HUDMovieBaseInstance.TemperatureMeter_mc"
 			}, false },
 
 			// SkyHUD specific elements
