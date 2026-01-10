@@ -1,5 +1,6 @@
-#include "Utils.h"
+#include "HUDManager.h"
 #include "Settings.h"
+#include "Utils.h"
 
 namespace Utils
 {
@@ -12,6 +13,15 @@ namespace Utils
 		"aCompassMarkerList",
 		"HUDHooksContainer"
 	};
+
+	// Registry to track SWF files known to be interactive interfaces.
+	// This allows MCMGen to prune them from the config even if the menu is closed.
+	static std::unordered_set<std::string> g_interactiveSources;
+	static std::mutex g_interactiveSourceLock;
+
+	// ==========================================
+	// String & Path Helpers
+	// ==========================================
 
 	std::string SanitizeName(const std::string& a_name)
 	{
@@ -77,36 +87,23 @@ namespace Utils
 		return a_path;
 	}
 
-	std::string GetWidgetDisplayName(const std::string& a_rawPath, const std::string& a_source)
+	std::string GetWidgetDisplayName(const std::string& a_source)
 	{
-		// 1. Try to get a clean name from the Source URL (e.g., "meter.swf" -> "Meter").
+		// 1. Extract the clean name from the Source URL (e.g., "meter.swf" -> "Meter").
+		// We rely on the fact that ScanArrayContainer and GetMenuURL ensure a_source is never empty.
 		std::string name = ExtractFilename(a_source);
 
-		// 2. If the Source was generic or missing (e.g. "Internal/SkyUI Widget"), we might get "Widget" or "SkyUI Widget".
-		// If it's too generic or empty, fall back to parsing the path.
-		bool isGeneric = name.empty() || name == "Unknown" || name == "Hudmenu";
-
-		if (isGeneric) {
-			// Check if it's a specific SkyUI container.
-			if (a_rawPath.find("WidgetContainer") != std::string::npos) {
-				// Parse "_root.WidgetContainer.10" -> "SkyUI Widget 10".
-				size_t lastDot = a_rawPath.rfind('.');
-				if (lastDot != std::string::npos && lastDot + 1 < a_rawPath.length()) {
-					return "SkyUI Widget " + a_rawPath.substr(lastDot + 1);
-				}
-			}
-
-			// Fallback: Use the path filename.
-			name = ExtractFilename(a_rawPath);
-		}
-
-		// 3. Final safety check.
+		// 2. Final safety check (Just in case ExtractFilename results in an empty string).
 		if (name.empty()) {
 			return "Unknown Widget";
 		}
 
 		return name;
 	}
+
+	// ==========================================
+	// Menu & URL Logic
+	// ==========================================
 
 	bool IsSystemMenu(const std::string& a_menuName)
 	{
@@ -139,6 +136,118 @@ namespace Utils
 		}
 		return "Unknown";
 	}
+
+	// ==========================================
+	// Interactive Menu Heuristics
+	// ==========================================
+
+	bool IsInteractiveMenu(RE::IMenu* a_menu)
+	{
+		if (!a_menu) {
+			return false;
+		}
+
+		using Flag = RE::UI_MENU_FLAGS;
+		auto flags = a_menu->menuFlags;
+
+		return flags.any(
+			Flag::kPausesGame,
+			Flag::kUsesCursor,
+			Flag::kUsesMenuContext,
+			Flag::kHasButtonBar);
+	}
+
+	void RegisterInteractiveSource(const std::string& a_source)
+	{
+		if (a_source.empty() || a_source == "Unknown")
+			return;
+		std::lock_guard<std::mutex> lock(g_interactiveSourceLock);
+		g_interactiveSources.insert(a_source);
+	}
+
+	bool IsSourceInteractive(const std::string& a_source)
+	{
+		if (a_source.empty())
+			return false;
+		std::lock_guard<std::mutex> lock(g_interactiveSourceLock);
+		return g_interactiveSources.contains(a_source);
+	}
+
+	// Debug logging option
+	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu)
+	{
+		if (!Settings::GetSingleton()->IsMenuFlagLoggingEnabled()) {
+			return;
+		}
+
+		if (!a_menu)
+			return;
+
+		// Guard: Only log each menu once per session to prevent spam
+		static std::unordered_set<std::string> _loggedMenus;
+		if (_loggedMenus.contains(a_name)) {
+			return;
+		}
+		_loggedMenus.insert(a_name);
+
+		using Flag = RE::UI_MENU_FLAGS;
+		auto flags = a_menu->menuFlags;
+
+		std::vector<std::string> activeFlags;
+
+		// Primary heuristic flags (The ones we ignore)
+		if (flags.all(Flag::kPausesGame))
+			activeFlags.push_back("PausesGame");
+		if (flags.all(Flag::kUsesCursor))
+			activeFlags.push_back("UsesCursor");
+		if (flags.all(Flag::kUsesMenuContext))
+			activeFlags.push_back("UsesMenuContext");
+		if (flags.all(Flag::kHasButtonBar))
+			activeFlags.push_back("HasButtonBar");
+
+		// Secondary flags (Informational)
+		if (flags.all(Flag::kAlwaysOpen))
+			activeFlags.push_back("AlwaysOpen");
+		if (flags.all(Flag::kModal))
+			activeFlags.push_back("Modal");
+		if (flags.all(Flag::kInventoryItemMenu))
+			activeFlags.push_back("InventoryItemMenu");
+		if (flags.all(Flag::kCustomRendering))
+			activeFlags.push_back("CustomRendering");
+		if (flags.all(Flag::kApplicationMenu))
+			activeFlags.push_back("ApplicationMenu");
+		if (flags.all(Flag::kRendersOffscreenTargets))
+			activeFlags.push_back("RendersOffscreen");
+		if (flags.all(Flag::kUsesMovementToDirection))
+			activeFlags.push_back("UsesMovementToDirection");
+		if (flags.all(Flag::kDisablePauseMenu))
+			activeFlags.push_back("DisablePauseMenu");
+		if (flags.all(Flag::kAllowSaving))
+			activeFlags.push_back("AllowSaving");
+		if (flags.all(Flag::kTopmostRenderedMenu))
+			activeFlags.push_back("Topmost");
+		if (flags.all(Flag::kAssignCursorToRenderer))
+			activeFlags.push_back("AssignCursorToRenderer");
+		if (flags.all(Flag::kRendersUnderPauseMenu))
+			activeFlags.push_back("RendersUnderPauseMenu");
+
+		std::string flagStr = activeFlags.empty() ? "None" : "";
+		for (size_t i = 0; i < activeFlags.size(); ++i) {
+			flagStr += activeFlags[i];
+			if (i < activeFlags.size() - 1)
+				flagStr += " | ";
+		}
+
+		bool isInteractive = IsInteractiveMenu(a_menu);
+
+		std::string logPrefix = isInteractive ? "Ignoring Interactive Menu" : "Analyzing Menu";
+
+		logger::info("{}: '{}'. Flags: [{}]", logPrefix, a_name, flagStr);
+	}
+
+	// ==========================================
+	// Widget Scanning Logic
+	// ==========================================
 
 	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes)
 	{

@@ -41,6 +41,7 @@ public:
 	[[nodiscard]] float GetFadeSpeed() const { return _fadeSpeed; }
 	[[nodiscard]] float GetDisplayDuration() const { return _displayDuration; }
 	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
+	[[nodiscard]] bool IsMenuFlagLoggingEnabled() const { return _logMenuFlags; }
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
 
@@ -59,11 +60,13 @@ private:
 	float _fadeSpeed = 5.0f;
 	float _displayDuration = 0.0f;
 	bool _dumpHUD = false;
+	bool _logMenuFlags = false;
 
 	CrosshairSettings _crosshair;
 	SneakMeterSettings _sneakMeter;
 
 	std::map<std::string, int> _widgetPathToMode;
+	std::map<std::string, int> _dynamicWidgetModes;
 	std::set<std::string> _subWidgetPaths;
 	std::map<std::string, std::string> _widgetSources;
 };

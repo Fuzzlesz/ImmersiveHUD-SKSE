@@ -719,19 +719,6 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 		}
 	}
 
-	if (hudMovie) {
-		for (const auto& def : HUDElements::Get()) {
-			for (const auto& path : def.paths) {
-				RE::GFxValue test;
-				if (hudMovie->GetVariable(&test, path)) {
-					if (settings->AddDiscoveredPath(path, "Internal/Vanilla")) {
-						changes = true;
-					}
-				}
-			}
-		}
-	}
-
 	// Scan External Menus
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -743,7 +730,27 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 		if (menuName == "HUD Menu" || menuName == "Fader Menu" || Utils::IsSystemMenu(menuName)) {
 			continue;
 		}
+
 		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kApplicationMenu)) {
+			continue;
+		}
+
+		if (Utils::IsInteractiveMenu(entry.menu.get())) {
+			Utils::LogMenuFlags(menuName, entry.menu.get());
+
+			// REGISTER AS INTERACTIVE SOURCE
+			// This allows MCMGen to prune it even if the menu is closed later.
+			std::string url = Utils::GetMenuURL(entry.menu->uiMovie);
+			Utils::RegisterInteractiveSource(Utils::UrlDecode(url));
+
+			// Force a config check once per session for this menu
+			// so that if it was previously in the config, it gets removed.
+			static std::unordered_set<std::string> prunedSessionList;
+			if (!prunedSessionList.contains(menuName)) {
+				changes = true;
+				prunedSessionList.insert(menuName);
+			}
+
 			continue;
 		}
 
@@ -751,6 +758,7 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 		if (settings->AddDiscoveredPath(menuName, url)) {
 			changes = true;
 			externalCount++;
+			Utils::LogMenuFlags(menuName, entry.menu.get());
 			logger::info("Discovered External Menu: {} [Source: {}]", menuName, url);
 		}
 	}
@@ -1188,6 +1196,10 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		}
 
 		if (Utils::IsSystemMenu(menuNameStr)) {
+			continue;
+		}
+
+		if (Utils::IsInteractiveMenu(entry.menu.get())) {
 			continue;
 		}
 

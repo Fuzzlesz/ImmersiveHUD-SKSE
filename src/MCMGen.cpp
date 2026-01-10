@@ -245,10 +245,27 @@ namespace MCMGen
 								// 2. Versioned IDs (Menu_v1 replaced by Menu_v2)
 								bool isStaleID = !existsInMemory && activeSources.contains(sourceStr);
 
+								bool isInteractivePrune = false;
+								if (!existsInMemory) {
+									if (auto activeMenu = RE::UI::GetSingleton()->GetMenu(rawID)) {
+										if (Utils::IsInteractiveMenu(activeMenu.get())) {
+											isInteractivePrune = true;
+										}
+									}
+								}
+								if (!existsInMemory && !isInteractivePrune) {
+									if (Utils::IsSourceInteractive(sourceStr)) {
+										isInteractivePrune = true;
+									}
+								}
+
 								bool shouldKeep = false;
 
 								if (existsInMemory || isVanilla) {
 									shouldKeep = true;
+								} else if (isInteractivePrune) {
+									shouldKeep = false;
+									logger::info("Pruning interactive menu from config: {}", rawID);
 								} else if (isStaleID) {
 									// It's definitely dead. The file is loaded elsewhere, so this specific ID is invalid.
 									shouldKeep = false;
@@ -339,69 +356,46 @@ namespace MCMGen
 				if (processedPaths.contains(path)) {
 					continue;
 				}
-				std::string pretty = Utils::GetWidgetDisplayName(path, source);
+				std::string pretty = Utils::GetWidgetDisplayName(source);
 				groupedWidgets[pretty].push_back({ path, source, pretty });
 			}
 
 			std::map<std::string, json> finalWidgetsMap;
 			for (auto& [prettyBase, widgets] : groupedWidgets) {
-				std::sort(widgets.begin(), widgets.end(), [](const WidgetInfo& a, const WidgetInfo& b) {
-					return a.rawPath < b.rawPath;
-				});
+				// We only take the first instance for the MCM setting to avoid clutter
+				const auto& w = widgets[0];
+				std::string displayName = prettyBase;
+				std::string safeID = Utils::SanitizeName(displayName);
+				std::string finalID = "iMode_" + safeID + ":Widgets";
+				std::string iniKey = "iMode_" + safeID;
 
-				bool multiple = widgets.size() > 1;
-				int counter = 1;
-
-				for (const auto& w : widgets) {
-					std::string displayName = w.prettyName;
-					if (multiple) {
-						displayName += " " + std::to_string(counter);
-						counter++;
-					}
-
-					std::string safeID = Utils::SanitizeName(displayName);
-					std::string finalID = "iMode_" + safeID + ":Widgets";
-					std::string iniKey = "iMode_" + safeID;
-					std::string help = "Source: " + w.source + "\nID: " + w.rawPath;
-
-					// Check INI state
-					bool existsInIni = iniLoaded && (ini.GetValue("Widgets", iniKey.c_str(), nullptr) != nullptr);
-
-					if (!existsInIni) {
-						// SETTING MIGRATION:
-						// If this is a new key, check if we have a valid orphan for this source.
-						// For SkyUI widgets shifting container positions, and mod authors versioning their names.
-						auto& orphans = potentialOrphans[w.source];
-
-						// Filter orphans: ensure we only look at orphans that were ACTUALLY pruned.
-						// (i.e., their ID is NOT in allPaths).
-						// We iterate backwards to find a match to pop.
-						long migratedValue = -1;
-						for (auto it = orphans.begin(); it != orphans.end();) {
-							if (allPaths.find(it->id) == allPaths.end()) {
-								// This orphan is dead. Adopt its value.
-								migratedValue = it->value;
-								orphans.erase(it);  // Remove so it isn't used twice
-								break;
-							} else {
-								++it;
-							}
-						}
-
-						if (migratedValue != -1) {
-							// Found a match! Write it immediately so it doesn't get overwritten by defaults.
-							ini.SetLongValue("Widgets", iniKey.c_str(), migratedValue);
-							logger::info("Migrated setting for {}: {} -> {}", displayName, w.source, migratedValue);
-							// Mark as existing so we don't add to newIniKeysWidgets (which writes default 1)
-							existsInIni = true;
-						}
-					}
-
-					if (!existsInIni) {
-						newIniKeysWidgets.push_back(iniKey);
-					}
-					finalWidgetsMap[finalID] = CreateEnum(displayName, finalID, help);
+				std::string help = "Source: " + w.source + "\nID: " + w.rawPath;
+				if (widgets.size() > 1) {
+					help += "\n(+ " + std::to_string(widgets.size() - 1) + " other instances)";
 				}
+
+				bool existsInIni = iniLoaded && (ini.GetValue("Widgets", iniKey.c_str(), nullptr) != nullptr);
+
+				if (!existsInIni) {
+					// SETTING MIGRATION:
+					// If this is a new key, check if we have a valid orphan for this source.
+					// Since we are grouping instances now, we take the first available orphan value.
+					auto& orphans = potentialOrphans[w.source];
+					long migratedValue = -1;
+					if (!orphans.empty()) {
+						migratedValue = orphans[0].value;
+						orphans.clear();  // Clear orphans for this source to prevent reuse
+					}
+					if (migratedValue != -1) {
+						ini.SetLongValue("Widgets", iniKey.c_str(), migratedValue);
+						logger::info("Migrated setting for {}: {} -> {}", displayName, w.source, migratedValue);
+						existsInIni = true;
+					}
+				}
+
+				if (!existsInIni)
+					newIniKeysWidgets.push_back(iniKey);
+				finalWidgetsMap[finalID] = CreateEnum(displayName, finalID, help);
 			}
 
 			// 7. Calculate Status Flags
@@ -432,12 +426,9 @@ namespace MCMGen
 
 			if (elementsContent) {
 				elementsContent->clear();
-				if (showRestartWarning) {
-					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "$fzIH_ElementNewFound" }, { "type", "text" } });
-				} else {
-					elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
-						{ "type", "text" } });
-				}
+				// For Elements, we always show the count. The list is static/hardcoded.
+				elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
+					{ "type", "text" } });
 				elementsContent->push_back({ { "type", "header" } });
 				for (const auto& widgetJson : elementsJsonList) {
 					elementsContent->push_back(widgetJson);

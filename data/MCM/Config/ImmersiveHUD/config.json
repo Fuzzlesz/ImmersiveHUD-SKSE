@@ -135,6 +135,19 @@
             "defaultValue": false,
             "sourceType": "ModSettingBool"
           }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "help": "$fzIH_HelpLogFlags",
+          "id": "bLogMenuFlags:HUD",
+          "text": "$fzIH_LogFlags",
+          "type": "toggle",
+          "valueOptions": {
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
+          }
         }
       ],
       "pageDisplayName": "$fzIH_PageGeneral"

@@ -2,12 +2,6 @@
 #include "HUDElements.h"
 #include "Utils.h"
 
-struct WidgetGroupItem
-{
-	std::string rawPath;
-	std::string prettyName;
-};
-
 void Settings::Load()
 {
 	CSimpleIniA ini;
@@ -30,56 +24,30 @@ void Settings::Load()
 	_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));
 	_displayDuration = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fDisplayDuration", 0.0));
 	_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
+	_logMenuFlags = ini.GetBoolValue(sectionHUD, "bLogMenuFlags", false);
 
 	_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
 	_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
 
 	_widgetPathToMode.clear();
-	std::unordered_set<std::string> vanillaPaths;
 
 	// Map Vanilla HUD Elements
 	for (const auto& def : HUDElements::Get()) {
 		int mode = ini.GetLongValue("HUDElements", def.id, 1);
 		for (const auto& path : def.paths) {
 			_widgetPathToMode[path] = mode;
-			vanillaPaths.insert(path);
 		}
 	}
 
-	// Map Dynamic Widgets
-	std::map<std::string, std::vector<WidgetGroupItem>> groupedWidgets;
+	// Cache Dynamic Widget settings from INI to support Source-based lookup.
+	// We read all keys in the "Widgets" section so we can match them later.
+	_dynamicWidgetModes.clear();
+	CSimpleIniA::TNamesDepend keys;
+	ini.GetAllKeys("Widgets", keys);
 
-	for (const auto& path : _subWidgetPaths) {
-		if (vanillaPaths.contains(path)) {
-			continue;
-		}
-
-		// Source is already pre-decoded in AddDiscoveredPath
-		std::string source = GetWidgetSource(path);
-		std::string pretty = Utils::GetWidgetDisplayName(path, source);
-		groupedWidgets[pretty].push_back({ path, pretty });
-	}
-
-	for (auto& [prettyBase, widgets] : groupedWidgets) {
-		// Sort by raw path to ensure deterministic numbering (Meter 1, Meter 2).
-		std::sort(widgets.begin(), widgets.end(), [](const WidgetGroupItem& a, const WidgetGroupItem& b) {
-			return a.rawPath < b.rawPath;
-		});
-
-		bool multiple = widgets.size() > 1;
-		int counter = 1;
-
-		for (const auto& w : widgets) {
-			std::string finalDisplayName = w.prettyName;
-			if (multiple) {
-				finalDisplayName += " " + std::to_string(counter);
-				counter++;
-			}
-
-			// Generate INI Key
-			std::string iniKey = "iMode_" + Utils::SanitizeName(finalDisplayName);
-			_widgetPathToMode[w.rawPath] = ini.GetLongValue("Widgets", iniKey.c_str(), 1);  // Default kImmersive
-		}
+	for (const auto& key : keys) {
+		int val = ini.GetLongValue("Widgets", key.pItem, 1);
+		_dynamicWidgetModes[key.pItem] = val;
 	}
 }
 
@@ -88,6 +56,7 @@ void Settings::ResetCache()
 	_subWidgetPaths.clear();
 	_widgetSources.clear();
 	_widgetPathToMode.clear();
+	_dynamicWidgetModes.clear();
 }
 
 void Settings::SetDumpHUDEnabled(bool a_enabled)
@@ -131,8 +100,24 @@ std::string Settings::GetWidgetSource(const std::string& a_path) const
 
 int Settings::GetWidgetMode(const std::string& a_rawPath) const
 {
+	// Check direct override (Vanilla elements / Static mappings)
 	auto it = _widgetPathToMode.find(a_rawPath);
-	return it != _widgetPathToMode.end() ? it->second : kImmersive;
+	if (it != _widgetPathToMode.end()) {
+		return it->second;
+	}
+
+	// Resolve Dynamic Source-based ID
+	// This ensures that "meter.swf" shares a setting regardless of being _root.WidgetContainer.5 or .13
+	std::string source = GetWidgetSource(a_rawPath);
+
+	// Generate the Stable ID
+	std::string prettyName = Utils::GetWidgetDisplayName(source);
+	std::string safeID = Utils::SanitizeName(prettyName);
+	std::string iniKey = "iMode_" + safeID;
+
+	// Look up the cached mode from the INI load
+	auto dit = _dynamicWidgetModes.find(iniKey);
+	return dit != _dynamicWidgetModes.end() ? dit->second : kImmersive;
 }
 
 const std::set<std::string>& Settings::GetSubWidgetPaths() const

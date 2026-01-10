@@ -12,13 +12,25 @@ namespace Utils
 	std::string ExtractFilename(std::string a_path);
 
 	// Central logic to determine the human-readable name for the MCM.
-	std::string GetWidgetDisplayName(const std::string& a_rawPath, const std::string& a_source);
+	std::string GetWidgetDisplayName(const std::string& a_source);
 
 	// Checks if a menu name corresponds to a vanilla System Menu (Map, Inventory, etc.)
 	bool IsSystemMenu(const std::string& a_menuName);
 
 	// Helper to safely extract the _url member from a MovieView
 	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie);
+
+	// Checks menu flags to determine if it is an interactive interface (e.g. Loot Menu, Explorer)
+	// rather than a passive HUD element.
+	bool IsInteractiveMenu(RE::IMenu* a_menu);
+
+	// Log flags
+	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu);
+
+	// Registry for Interactive Sources (SWF files detected as interactive)
+	// Used to prune config entries even if the menu is closed.
+	void RegisterInteractiveSource(const std::string& a_source);
+	bool IsSourceInteractive(const std::string& a_source);
 
 	// Shared logic for scanning SkyUI Widget Containers.
 	void ScanArrayContainer(const std::string& a_path, const RE::GFxValue& a_container, int& a_foundCount, bool& a_changes);
