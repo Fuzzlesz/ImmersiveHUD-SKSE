@@ -54,7 +54,8 @@ namespace Utils
 	class ContainerDiscoveryVisitor : public RE::GFxValue::ObjectVisitor
 	{
 	public:
-		ContainerDiscoveryVisitor(int& a_count, bool& a_changes, std::string a_pathPrefix, int a_depth = 0);
+		// Depth default set to 2 to allow entry into HUDMovieBaseInstance -> Children
+		ContainerDiscoveryVisitor(int& a_count, bool& a_changes, std::string a_pathPrefix, int a_depth = 2);
 		void Visit(const char* a_name, const RE::GFxValue& a_val) override;
 
 	private:

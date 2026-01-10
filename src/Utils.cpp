@@ -5,13 +5,12 @@
 namespace Utils
 {
 	// Blocklist to help against recursion and snagging junk/crashing.
-	// NOTE: Removed "HUDMovieBaseInstance" from here so the Debug Dump can see it.
-	// It is now manually blocked in ContainerDiscoveryVisitor instead.
 	static const std::unordered_set<std::string> kDiscoveryBlockList = {
 		"markerData",
 		"widgetLoaderContainer",
 		"aCompassMarkerList",
-		"HUDHooksContainer"
+		"HUDHooksContainer",
+		"HudElements"
 	};
 
 	// Registry to track SWF files known to be interactive interfaces.
@@ -379,13 +378,6 @@ namespace Utils
 			return;
 		}
 
-		// Explicitly block the main HUD instance from discovery to avoid duplicating
-		// vanilla elements that are already handled by HUDElements::Get().
-		// We handle this here specifically so the DebugVisitor (Dump Button) can still see it.
-		if (name == "HUDMovieBaseInstance") {
-			return;
-		}
-
 		std::string currentPath = _pathPrefix + "." + name;
 
 		// Special handling for SkyUI WidgetContainer
@@ -399,9 +391,17 @@ namespace Utils
 			RE::GFxValue urlVal;
 			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
 				std::string url = urlVal.GetString();
+				std::string lowerUrl = url;
+				std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
 
-				// Skip the HUD menu itself
-				if (!url.ends_with("hudmenu.swf") && !url.ends_with("HUDMenu.swf")) {
+				// Exclude Compass Navigation Overhaul elements
+				if (lowerUrl.find("compass.swf") != std::string::npos ||
+					lowerUrl.find("questitemlist.swf") != std::string::npos) {
+					return;
+				}
+
+				// If it's not the vanilla HUD, add it to settings.
+				if (lowerUrl.find("hudmenu.swf") == std::string::npos) {
 					// Always increment found count for population check
 					_count++;
 
