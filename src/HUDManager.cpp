@@ -5,7 +5,6 @@
 #include "MCMGen.h"
 #include "Settings.h"
 #include "Utils.h"
-#include <numbers>
 
 // ==========================================
 // Utility Classes
@@ -166,6 +165,8 @@ void HUDManager::ResetSession()
 {
 	_isRuntime = false;
 	_hasScanned = false;
+	_hasInitializedConfig = false;
+	MCMGen::ResetSessionFlag();  // Clear "NEW FOUND" flag on actual relaunch
 }
 
 void HUDManager::StartRuntime()
@@ -731,11 +732,11 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 		if (menuName == "HUD Menu" || menuName == "Fader Menu" || Utils::IsSystemMenu(menuName)) {
 			continue;
 		}
-
 		if (entry.menu->menuFlags.any(RE::IMenu::Flag::kApplicationMenu)) {
 			continue;
 		}
 
+		// Interactive Menus (Pruning Logic)
 		if (Utils::IsInteractiveMenu(entry.menu.get())) {
 			Utils::LogMenuFlags(menuName, entry.menu.get());
 
@@ -755,6 +756,7 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 			continue;
 		}
 
+		// Standard External Widget Discovery
 		std::string url = Utils::GetMenuURL(entry.menu->uiMovie);
 		if (settings->AddDiscoveredPath(menuName, url)) {
 			changes = true;
@@ -765,6 +767,8 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 	}
 
 	// Scan Widget Containers
+	bool skyUIContainerFound = false;
+
 	if (hudMovie) {
 		if (a_deepScan) {
 			ScanForContainers(hudMovie, containerCount, changes);
@@ -777,23 +781,34 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 				}
 			}
 		}
+
+		// Explicitly verify if the SkyUI "WidgetContainer" member exists.
+		// We use this flag specifically to control the MCMGen pruning logic.
+		// If we relied on 'containerCount', other mods could trigger it, causing SkyUI widgets
+		// to be pruned before they have loaded.
+		RE::GFxValue rootVal, wcVal;
+		if (hudMovie->GetVariable(&rootVal, "_root") && rootVal.GetMember("WidgetContainer", &wcVal)) {
+			skyUIContainerFound = true;
+		}
 	}
 
-	// Heuristic: If we detect active containers, SkyUI has finished loading.
-	// We set this flag to true to allow MCMGen to safely prune uninstalled widgets.
-	// Until this is true (during Initial Scans), we protect widgets from being removed.
-	if (containerCount > 0) {
+	// Only mark populated if the ACTUAL SkyUI container is found.
+	// This prevents other mods from triggering the "Prune SkyUI" logic during Mid Scan.
+	if (skyUIContainerFound) {
 		_widgetsPopulated = true;
 	}
 
 	// Only proceed to update config.json if something actually changed.
-	if (changes || a_forceUpdate) {
+	if (changes || a_forceUpdate || !_hasInitializedConfig) {
 		Settings::GetSingleton()->Load();
 
 		// Update MCM JSON.
 		// 1. Pass a_isRuntime to control Status Text (avoid stale "New Found" messages).
 		// 2. Pass _widgetsPopulated to Safe Prune (skip missing widgets if false).
 		MCMGen::Update(a_isRuntime, _widgetsPopulated);
+
+		// Mark as initialized after first call
+		_hasInitializedConfig = true;
 
 		// Only log if we found new *user* content (External/Widgets).
 		// Silently handle vanilla internal updates to avoid log spam when counts are 0.
@@ -1131,7 +1146,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	const auto& pathSet = settings->GetSubWidgetPaths();
 	for (const auto& path : pathSet) {
-		// Generic HUD check: prevents dynamic scan from stomping on processed vanilla elements
 		if (processedPaths.contains(path) ||
 			path == "_root.HUDMovieBaseInstance.StealthMeterInstance") {
 			continue;
@@ -1142,16 +1156,37 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			continue;
 		}
 
+		RE::GFxValue elem;
+		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
+			continue;
+		}
+
+		// RUNTIME VERIFICATION (Fix for SkyUI WidgetContainer Indices)
+		// Only control widgets if the currently loaded Source matches what we cached.
+		if (!_verifiedPaths.contains(path)) {
+			RE::GFxValue urlVal;
+			if (elem.GetMember("_url", &urlVal) && urlVal.IsString()) {
+				std::string rawUrl = urlVal.GetString();
+				std::string decodedUrl = Utils::UrlDecode(rawUrl);
+				std::string expectedUrl = settings->GetWidgetSource(path);
+
+				if (decodedUrl == expectedUrl) {
+					_verifiedPaths.insert(path);
+				} else {
+					// MISMATCH! Index X has changed owners.
+					// Do not control it. Wait for the Scanner to update Settings.
+					continue;
+				}
+			} else {
+				continue;
+			}
+		}
+
 		int mode = settings->GetWidgetMode(path);
 
 		// Menus active: relinquish control of dynamic widgets to allow 3rd party function.
 		// Important for mod-added system menus, and widgets open during vanilla menus.
 		if (menuOpen && mode != Settings::kHidden && !isConsoleOpen) {
-			continue;
-		}
-
-		RE::GFxValue elem;
-		if (!a_movie->GetVariable(&elem, path.c_str()) || !elem.IsDisplayObject()) {
 			continue;
 		}
 

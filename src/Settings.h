@@ -28,6 +28,7 @@ public:
 	};
 
 	void Load();
+	void SaveCache();
 	void ResetCache();
 	void SetDumpHUDEnabled(bool a_enabled);
 

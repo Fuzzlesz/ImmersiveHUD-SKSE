@@ -399,15 +399,21 @@ namespace Utils
 				}
 
 				// If it's not the vanilla HUD, add it to settings.
-				if (lowerUrl.find("hudmenu.swf") == std::string::npos) {
+				bool isVanilla = (lowerUrl.find("hudmenu.swf") != std::string::npos);
+
+				if (!isVanilla) {
 					// Always increment found count for population check
 					_count++;
-
 					if (Settings::GetSingleton()->AddDiscoveredPath(currentPath, url)) {
 						_changes = true;
 						logger::info("Discovered External Element: {} [Source: {}]", currentPath, url);
 					}
-					// Don't recurse into discovered widgets - we've found what we need
+					// Don't recurse into discovered external widgets
+					return;
+				}
+
+				// If we are here, it is a Vanilla object.
+				if (name != "HUDMovieBaseInstance") {
 					return;
 				}
 			}

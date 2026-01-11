@@ -67,6 +67,10 @@ private:
 	bool _isSkyHUDActive = false;
 	bool _widgetsPopulated = false;
 	bool _isRuntime = false;
+	bool _hasInitializedConfig = false;
+
+	// Runtime Verification
+	std::unordered_set<std::string> _verifiedPaths;
 
 	// Alpha Transition Values
 	float _currentAlpha = 0.0f;

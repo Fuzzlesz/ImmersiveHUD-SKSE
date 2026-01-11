@@ -49,6 +49,51 @@ void Settings::Load()
 		int val = ini.GetLongValue("Widgets", key.pItem, 1);
 		_dynamicWidgetModes[key.pItem] = val;
 	}
+
+	// Pre-load paths discovered in previous sessions from cache file.
+	if (_subWidgetPaths.empty()) {
+		CSimpleIniA cacheIni;
+		cacheIni.SetUnicode();
+
+		const char* cachePath = "Data/MCM/Settings/ImmersiveHUD_Cache.ini";
+
+		if (cacheIni.LoadFile(cachePath) >= 0) {
+			CSimpleIniA::TNamesDepend cacheKeys;
+			cacheIni.GetAllKeys("PathCache", cacheKeys);
+
+			for (const auto& key : cacheKeys) {
+				std::string path = key.pItem;
+				std::string source = cacheIni.GetValue("PathCache", key.pItem, "");
+
+				// Insert directly (bypass scanning logic)
+				_subWidgetPaths.insert(path);
+				if (!source.empty()) {
+					_widgetSources[path] = source;
+				}
+			}
+		}
+	}
+}
+
+void Settings::SaveCache()
+{
+	CSimpleIniA cacheIni;
+	cacheIni.SetUnicode();
+
+	const char* cachePath = "Data/MCM/Settings/ImmersiveHUD_Cache.ini";
+
+	// Ensure the directory exists (in case the user hasn't changed an MCM setting yet)
+	try {
+		fs::create_directories("Data/MCM/Settings");
+	} catch (...) {}
+
+	// We start fresh with the cache file to avoid stale entries
+	for (const auto& path : _subWidgetPaths) {
+		std::string source = GetWidgetSource(path);
+		cacheIni.SetValue("PathCache", path.c_str(), source.c_str());
+	}
+
+	cacheIni.SaveFile(cachePath);
 }
 
 void Settings::ResetCache()
@@ -79,17 +124,25 @@ void Settings::SetDumpHUDEnabled(bool a_enabled)
 
 bool Settings::AddDiscoveredPath(const std::string& a_path, const std::string& a_source)
 {
-	// Check if already exists first to avoid string ops
-	if (_subWidgetPaths.contains(a_path)) {
-		return false;
+	bool changed = false;
+
+	// 1. Add path if new
+	if (!_subWidgetPaths.contains(a_path)) {
+		_subWidgetPaths.insert(a_path);
+		changed = true;
 	}
 
-	_subWidgetPaths.insert(a_path);
+	// 2. Update Source if changed
+	// Necessary for index collision handling (e.g. if WidgetContainer.0 changes from "Meter" to "Clock")
 	if (!a_source.empty()) {
-		// Store decoded source once to prevent repetitive decoding elsewhere
-		_widgetSources[a_path] = Utils::UrlDecode(a_source);
+		std::string decoded = Utils::UrlDecode(a_source);
+		if (_widgetSources[a_path] != decoded) {
+			_widgetSources[a_path] = decoded;
+			changed = true;
+		}
 	}
-	return true;
+
+	return changed;
 }
 
 std::string Settings::GetWidgetSource(const std::string& a_path) const

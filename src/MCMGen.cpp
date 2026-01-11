@@ -5,8 +5,6 @@
 #include "Settings.h"
 #include "Utils.h"
 
-namespace fs = std::filesystem;
-
 namespace MCMGen
 {
 	static bool _iniModifiedThisSession = false;
@@ -99,6 +97,11 @@ namespace MCMGen
 		long value;
 	};
 
+	void ResetSessionFlag()
+	{
+		_iniModifiedThisSession = false;
+	}
+
 	// ==========================================
 	// Main Update Loop
 	// ==========================================
@@ -108,10 +111,6 @@ namespace MCMGen
 		const fs::path configDir = "Data/MCM/Config/ImmersiveHUD";
 		const fs::path configPath = configDir / "config.json";
 		const fs::path iniPath = configDir / "settings.ini";
-
-		try {
-			fs::create_directories(configDir);
-		} catch (...) {}
 
 		try {
 			// 1. Load Configs
@@ -145,6 +144,8 @@ namespace MCMGen
 
 			// Track IDs present in the previous session's JSON
 			std::unordered_set<std::string> previousJsonIDs;
+			// Track Sources present in the previous session's JSON (to detect index shifts)
+			std::unordered_set<std::string> previousJsonSources;
 
 			// Harvest potential orphans (current settings in the JSON)
 			// We map Source -> List of Orphans
@@ -164,7 +165,6 @@ namespace MCMGen
 
 			// Source Collision Prep:
 			// Build a set of all Source Files currently loaded in memory.
-			// This allows us to detect if a specific SWF has moved to a new ID (e.g. SkyUI reordering).
 			std::unordered_set<std::string> activeSources;
 			for (const auto& path : activePaths) {
 				activeSources.insert(settings->GetWidgetSource(path));
@@ -174,7 +174,7 @@ namespace MCMGen
 			for (const auto& page : config["pages"]) {
 				std::string pName = page.value("pageDisplayName", "");
 
-				// Scan both Widget page to recover IDs
+				// Scan Widget page to recover IDs
 				if (pName == "$fzIH_PageWidgets" && page.contains("content")) {
 					for (const auto& item : page["content"]) {
 						if (item.contains("help")) {
@@ -206,6 +206,8 @@ namespace MCMGen
 
 							if (!rawID.empty()) {
 								previousJsonIDs.insert(rawID);
+								// Register the source so we know this mod was already installed
+								previousJsonSources.insert(sourceStr);
 
 								// Harvest Orphan Candidate
 								// We grab the INI key from the JSON ID (strip ":Widgets")
@@ -299,15 +301,32 @@ namespace MCMGen
 
 			for (const auto& path : memPaths) {
 				std::string src = settings->GetWidgetSource(path);
+
+				// If we are at the Main Menu (!a_widgetsPopulated), SkyUI widgets cannot physically exist.
+				// Any entries appearing in memPaths are leftovers from the INI cache.
+				// We must ignore them to prevent false "New Found" flags due to index shifting.
+				bool isSkyUIWidget = (path.find("_root.WidgetContainer.") != std::string::npos);
+				if (isSkyUIWidget && !a_widgetsPopulated) {
+					continue;
+				}
+
 				allPaths[path] = src;
 
 				// Detection Logic: Was this widget missing from the previous config?
 				if (!previousJsonIDs.contains(path)) {
-					// Ignore vanilla secondary paths (e.g. HealthMeterLeft) to prevent false positives.
 					if (hardcodedVanillaPaths.contains(path)) {
 						continue;
 					}
-					foundNewWidgetInJson = true;
+
+					// Check if the Source was already present (Index Shift vs New Mod).
+					// If the source exists but the specific ID changed (e.g. .19 -> .22), it is an index shift.
+					// This does not require a restart because settings are resolved via Source.
+					if (previousJsonSources.contains(src)) {
+						logger::info("Widget index shift detected: {} [Source: {}]. Updating config without status change.", path, src);
+					} else {
+						logger::info("New widget detected: {} [Source: {}]", path, src);
+						foundNewWidgetInJson = true;
+					}
 				}
 			}
 
@@ -416,6 +435,10 @@ namespace MCMGen
 				}
 			}
 
+			// Show restart warning ONLY during non-runtime scans where new content was found
+			// Runtime scans always show "registered" count since MCM can't update anyway
+			bool showRestartWarning = !a_isRuntime && _iniModifiedThisSession;
+
 			// 8. Inject JSON Content
 			json* widgetsContent = nullptr;
 			json* elementsContent = nullptr;
@@ -429,12 +452,34 @@ namespace MCMGen
 				}
 			}
 
-			bool showRestartWarning = _iniModifiedThisSession;
+			// Track if status text changed for write decision
+			bool statusChanged = false;
+			std::string oldWidgetStatus = "";
+			std::string oldElementStatus = "";
+
+			// Capture old status before clearing
+			if (widgetsContent && !widgetsContent->empty()) {
+				if ((*widgetsContent)[0].contains("text")) {
+					oldWidgetStatus = (*widgetsContent)[0]["text"].get<std::string>();
+				}
+			}
+			if (elementsContent && !elementsContent->empty()) {
+				if ((*elementsContent)[0].contains("text")) {
+					oldElementStatus = (*elementsContent)[0]["text"].get<std::string>();
+				}
+			}
 
 			if (elementsContent) {
 				elementsContent->clear();
+				std::string newStatus = "<font color='#00FF00'>Status: " +
+				                        std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>";
+
+				if (oldElementStatus != newStatus) {
+					statusChanged = true;
+				}
+
 				// For Elements, we always show the count. The list is static/hardcoded.
-				elementsContent->push_back({ { "id", "ElemStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(elementsJsonList.size()) + " HUD Elements registered.</font>" },
+				elementsContent->push_back({ { "id", "ElemStatus" }, { "text", newStatus },
 					{ "type", "text" } });
 				elementsContent->push_back({ { "type", "header" } });
 				for (const auto& widgetJson : elementsJsonList) {
@@ -444,12 +489,19 @@ namespace MCMGen
 
 			if (widgetsContent) {
 				widgetsContent->clear();
+				std::string newStatus;
 				if (showRestartWarning) {
-					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "$fzIH_WidgetNewFound" }, { "type", "text" } });
+					newStatus = "$fzIH_WidgetNewFound";
 				} else {
-					widgetsContent->push_back({ { "id", "WidStatus" }, { "text", "<font color='#00FF00'>Status: " + std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>" },
-						{ "type", "text" } });
+					newStatus = "<font color='#00FF00'>Status: " +
+					            std::to_string(finalWidgetsMap.size()) + " widgets registered.</font>";
 				}
+
+				if (oldWidgetStatus != newStatus) {
+					statusChanged = true;
+				}
+
+				widgetsContent->push_back({ { "id", "WidStatus" }, { "text", newStatus }, { "type", "text" } });
 				widgetsContent->push_back({ { "type", "header" } });
 				for (const auto& [id, widgetJson] : finalWidgetsMap) {
 					widgetsContent->push_back(widgetJson);
@@ -457,7 +509,12 @@ namespace MCMGen
 			}
 
 			// 9. Write to Disk
-			if (config != originalConfig) {
+			// Only write if config changed OR if we have meaningful changes OR status changed
+			bool contentChanged = !newIniKeysElements.empty() || !newIniKeysWidgets.empty() || foundNewWidgetInJson;
+			bool isInitialCreation = originalConfig.empty() || !originalConfig.contains("pages");
+			bool shouldWrite = (config != originalConfig) || contentChanged || statusChanged || isInitialCreation;
+
+			if (shouldWrite) {
 				std::ofstream outFile(configPath, std::ios::trunc);
 				if (outFile.is_open()) {
 					// Use 2-space indent, nlohmann usually defaults to alpha keys
@@ -472,6 +529,11 @@ namespace MCMGen
 
 				ini.SaveFile(iniPath.string().c_str());
 			}
+
+			// 10. Update Cache (Anti-Flicker)
+			// Persist the discovered paths to the INI so next session
+			// we can target them immediately on load.
+			Settings::GetSingleton()->SaveCache();
 
 		} catch (...) {
 			logger::error("Failed to update MCM JSON");

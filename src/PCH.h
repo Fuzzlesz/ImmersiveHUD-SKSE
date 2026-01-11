@@ -22,6 +22,7 @@
 namespace logger = SKSE::log;
 namespace string = clib_util::string;
 namespace dist = clib_util::distribution;
+namespace fs = std::filesystem;
 
 using namespace std::literals;
 using namespace clib_util::singleton;
