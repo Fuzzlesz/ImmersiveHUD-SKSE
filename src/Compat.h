@@ -21,6 +21,7 @@ public:
 	bool IsFakeFirstPerson();
 
 	// External Control Logic
+	bool IsImmersiveHUDDisabled();
 	bool IsCompassAllowed();
 	bool IsSneakAllowed();
 
@@ -44,6 +45,7 @@ public:
 	RE::TESGlobal* g_IFPV = nullptr;
 
 	// Generic HUD Control Globals (from ImmersiveHUD.esp)
+	RE::TESGlobal* g_DisableiHUD = nullptr;     // 0xDDD
 	RE::TESGlobal* g_DisableCompass = nullptr;  // 0xEEE
 	RE::TESGlobal* g_DisableSneak = nullptr;    // 0xFFF
 

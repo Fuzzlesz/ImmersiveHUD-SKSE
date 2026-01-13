@@ -18,6 +18,9 @@ void Compat::InitExternalData()
 
 	// Internal Global Control lookup (ImmersiveHUD.esp)
 	// These allow external mods to force-hide elements via script/patch
+	if (!g_DisableiHUD) {
+		g_DisableiHUD = dataHandler->LookupForm<RE::TESGlobal>(0xDDD, "ImmersiveHUD.esp");
+	}
 	if (!g_DisableCompass) {
 		g_DisableCompass = dataHandler->LookupForm<RE::TESGlobal>(0xEEE, "ImmersiveHUD.esp");
 	}
@@ -25,7 +28,7 @@ void Compat::InitExternalData()
 		g_DisableSneak = dataHandler->LookupForm<RE::TESGlobal>(0xFFF, "ImmersiveHUD.esp");
 	}
 
-	if (g_DisableCompass || g_DisableSneak) {
+	if (g_DisableCompass || g_DisableSneak || g_DisableiHUD) {
 		logger::info("Linked generic HUD control globals from ImmersiveHUD.esp");
 	}
 }
@@ -111,6 +114,12 @@ bool Compat::IsFakeFirstPerson()
 
 	auto thirdPersonState = static_cast<RE::ThirdPersonState*>(camera->currentState.get());
 	return thirdPersonState && thirdPersonState->currentZoomOffset == -0.275f;
+}
+
+bool Compat::IsImmersiveHUDDisabled()
+{
+	// ImmersiveHUD is disabled when the global is set to 1
+	return g_DisableiHUD && (g_DisableiHUD->value != 0.0f);
 }
 
 bool Compat::IsCompassAllowed()

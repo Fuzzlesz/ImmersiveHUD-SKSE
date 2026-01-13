@@ -290,6 +290,15 @@ void HUDManager::Update(float a_delta)
 		return;
 	}
 
+	// TESGlobal in esp file to relinquish HUD control
+	if (compat->IsImmersiveHUDDisabled()) {
+		// Release SmoothCam control if we had it
+		if (compat->g_SmoothCam) {
+			compat->ManageSmoothCamControl(false);
+		}
+		return;
+	}
+
 	const auto settings = Settings::GetSingleton();
 
 	// Timed display logic: decrement timer and toggle visibility off when expired
