@@ -101,6 +101,7 @@ bool Compat::IsIFPVActive()
 	return g_IFPV && (g_IFPV->value != 0.0f);
 }
 
+// Heuristic for "Improved Camera", provided by ArranzCNL
 bool Compat::IsFakeFirstPerson()
 {
 	auto camera = RE::PlayerCamera::GetSingleton();
