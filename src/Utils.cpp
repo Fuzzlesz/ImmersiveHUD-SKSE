@@ -392,7 +392,8 @@ namespace Utils
 				std::string lowerUrl = url;
 				std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
 
-				// Exclude Compass Navigation Overhaul elements
+				// Exclude Compass Navigation Overhaul compass for harmless settings conflict.
+				// QuestItemList visibility is tied to the compass already, we don't want control.
 				if (lowerUrl.find("compass.swf") != std::string::npos ||
 					lowerUrl.find("questitemlist.swf") != std::string::npos) {
 					return;
