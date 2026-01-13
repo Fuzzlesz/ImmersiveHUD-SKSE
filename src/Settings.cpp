@@ -168,9 +168,14 @@ int Settings::GetWidgetMode(const std::string& a_rawPath) const
 	std::string safeID = Utils::SanitizeName(prettyName);
 	std::string iniKey = "iMode_" + safeID;
 
-	// Look up the cached mode from the INI load
-	auto dit = _dynamicWidgetModes.find(iniKey);
-	return dit != _dynamicWidgetModes.end() ? dit->second : kImmersive;
+	// Look up the cached mode from the INI load (case-insensitive)
+	for (const auto& [key, value] : _dynamicWidgetModes) {
+		if (string::iequals(key, iniKey)) {
+			return value;
+		}
+	}
+
+	return kImmersive;
 }
 
 const std::set<std::string>& Settings::GetSubWidgetPaths() const
