@@ -2,62 +2,79 @@
 #include "HUDElements.h"
 #include "Utils.h"
 
-void Settings::Load()
+// -------------------------------------------------------------------------
+// Helper: Loads a Default INI, then overlays a User INI, then runs callback
+// -------------------------------------------------------------------------
+void Settings::LoadINI(const fs::path& a_defaultPath, const fs::path& a_userPath, INIFunc a_func)
 {
 	CSimpleIniA ini;
 	ini.SetUnicode();
 
-	// Load the base config (has all defaults)
-	const char* configPath = "Data/MCM/Config/ImmersiveHUD/settings.ini";
-	ini.LoadFile(configPath);
+	// 1. Load the Base Config (Read-Only reference)
+	if (fs::exists(a_defaultPath)) {
+		ini.LoadFile(a_defaultPath.string().c_str());
+	}
 
-	// Overlay user changes (only contains modified values)
-	const char* userPath = "Data/MCM/Settings/ImmersiveHUD.ini";
-	ini.LoadFile(userPath);
+	// 2. Load User Config (Overrides)
+	if (fs::exists(a_userPath)) {
+		ini.LoadFile(a_userPath.string().c_str());
+	}
 
-	const char* sectionHUD = "HUD";
-	_toggleKey = ini.GetLongValue(sectionHUD, "iToggleKey", 45);
-	_holdMode = ini.GetBoolValue(sectionHUD, "bHoldMode", false);
-	_startVisible = ini.GetBoolValue(sectionHUD, "bStartVisible", false);
-	_alwaysShowInCombat = ini.GetBoolValue(sectionHUD, "bShowInCombat", false);
-	_alwaysShowWeaponDrawn = ini.GetBoolValue(sectionHUD, "bShowWeaponDrawn", false);
-	_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));
-	_displayDuration = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fDisplayDuration", 0.0));
-	_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
-	_logMenuFlags = ini.GetBoolValue(sectionHUD, "bLogMenuFlags", false);
+	// 3. Execute the data extraction logic
+	if (a_func) {
+		a_func(ini);
+	}
+}
 
-	_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
-	_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
+// -------------------------------------------------------------------------
+// Main Load Function
+// -------------------------------------------------------------------------
+void Settings::Load()
+{
+	// Use the helper to handle file I/O logic
+	LoadINI(defaultPath, userPath, [&](CSimpleIniA& ini) {
+		const char* sectionHUD = "HUD";
 
-	_widgetPathToMode.clear();
+		_toggleKey = ini.GetLongValue(sectionHUD, "iToggleKey", 45);
+		_holdMode = ini.GetBoolValue(sectionHUD, "bHoldMode", false);
+		_startVisible = ini.GetBoolValue(sectionHUD, "bStartVisible", false);
+		_alwaysShowInCombat = ini.GetBoolValue(sectionHUD, "bShowInCombat", false);
+		_alwaysShowWeaponDrawn = ini.GetBoolValue(sectionHUD, "bShowWeaponDrawn", false);
+		_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));
+		_displayDuration = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fDisplayDuration", 0.0));
+		_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
+		_logMenuFlags = ini.GetBoolValue(sectionHUD, "bLogMenuFlags", false);
 
-	// Map Vanilla HUD Elements
-	for (const auto& def : HUDElements::Get()) {
-		int mode = ini.GetLongValue("HUDElements", def.id, 1);
-		for (const auto& path : def.paths) {
-			_widgetPathToMode[path] = mode;
+		_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
+		_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
+
+		// --- Map Vanilla HUD Elements ---
+		_widgetPathToMode.clear();
+		for (const auto& def : HUDElements::Get()) {
+			int mode = ini.GetLongValue("HUDElements", def.id, 1);
+			for (const auto& path : def.paths) {
+				_widgetPathToMode[path] = mode;
+			}
 		}
-	}
 
-	// Cache Dynamic Widget settings from INI to support Source-based lookup.
-	// We read all keys in the "Widgets" section so we can match them later.
-	_dynamicWidgetModes.clear();
-	CSimpleIniA::TNamesDepend keys;
-	ini.GetAllKeys("Widgets", keys);
+		// --- Cache Dynamic Widget Settings ---
+		// We read all keys in "Widgets" to match source files later
+		_dynamicWidgetModes.clear();
+		CSimpleIniA::TNamesDepend keys;
+		ini.GetAllKeys("Widgets", keys);
 
-	for (const auto& key : keys) {
-		int val = ini.GetLongValue("Widgets", key.pItem, 1);
-		_dynamicWidgetModes[key.pItem] = val;
-	}
+		for (const auto& key : keys) {
+			int val = ini.GetLongValue("Widgets", key.pItem, 1);
+			_dynamicWidgetModes[key.pItem] = val;
+		}
+	});
 
-	// Pre-load paths discovered in previous sessions from cache file.
-	if (_subWidgetPaths.empty()) {
+	// --- Load Path Cache ---
+	if (_subWidgetPaths.empty() && fs::exists(cachePath)) {
 		CSimpleIniA cacheIni;
 		cacheIni.SetUnicode();
 
-		const char* cachePath = "Data/MCM/Settings/ImmersiveHUD_Cache.ini";
-
-		if (cacheIni.LoadFile(cachePath) >= 0) {
+		if (cacheIni.LoadFile(cachePath.string().c_str()) >= 0) {
 			CSimpleIniA::TNamesDepend cacheKeys;
 			cacheIni.GetAllKeys("PathCache", cacheKeys);
 
@@ -80,20 +97,20 @@ void Settings::SaveCache()
 	CSimpleIniA cacheIni;
 	cacheIni.SetUnicode();
 
-	const char* cachePath = "Data/MCM/Settings/ImmersiveHUD_Cache.ini";
-
 	// Ensure the directory exists (in case the user hasn't changed an MCM setting yet)
 	try {
-		fs::create_directories("Data/MCM/Settings");
+		if (const auto dir = cachePath.parent_path(); !fs::exists(dir)) {
+			fs::create_directories(dir);
+		}
 	} catch (...) {}
 
-	// We start fresh with the cache file to avoid stale entries
+	// Rewrite cache to avoid stale entries
 	for (const auto& path : _subWidgetPaths) {
 		std::string source = GetWidgetSource(path);
 		cacheIni.SetValue("PathCache", path.c_str(), source.c_str());
 	}
 
-	cacheIni.SaveFile(cachePath);
+	cacheIni.SaveFile(cachePath.string().c_str());
 }
 
 void Settings::ResetCache()
@@ -111,15 +128,20 @@ void Settings::SetDumpHUDEnabled(bool a_enabled)
 	CSimpleIniA ini;
 	ini.SetUnicode();
 
-	// We only load/save the User Settings file (not the Config default)
-	const char* userPath = "Data/MCM/Settings/ImmersiveHUD.ini";
+	// We only edit the User path
+	if (fs::exists(userPath)) {
+		ini.LoadFile(userPath.string().c_str());
+	}
 
-	// Try to load existing user settings to preserve other values
-	ini.LoadFile(userPath);
+	// Ensure directory exists if this is the first time saving
+	try {
+		if (const auto dir = userPath.parent_path(); !fs::exists(dir)) {
+			fs::create_directories(dir);
+		}
+	} catch (...) {}
 
 	ini.SetLongValue("HUD", "bDumpHUD", a_enabled ? 1 : 0);
-
-	ini.SaveFile(userPath);
+	ini.SaveFile(userPath.string().c_str());
 }
 
 bool Settings::AddDiscoveredPath(const std::string& a_path, const std::string& a_source)
@@ -153,13 +175,13 @@ std::string Settings::GetWidgetSource(const std::string& a_path) const
 
 int Settings::GetWidgetMode(const std::string& a_rawPath) const
 {
-	// Check direct override (Vanilla elements / Static mappings)
+	// 1. Check direct override (Vanilla elements / Static mappings)
 	auto it = _widgetPathToMode.find(a_rawPath);
 	if (it != _widgetPathToMode.end()) {
 		return it->second;
 	}
 
-	// Resolve Dynamic Source-based ID
+	// 2. Resolve Dynamic Source-based ID
 	// This ensures that "meter.swf" shares a setting regardless of being _root.WidgetContainer.5 or .13
 	std::string source = GetWidgetSource(a_rawPath);
 
@@ -168,17 +190,12 @@ int Settings::GetWidgetMode(const std::string& a_rawPath) const
 	std::string safeID = Utils::SanitizeName(prettyName);
 	std::string iniKey = "iMode_" + safeID;
 
-	// Look up the cached mode from the INI load (case-insensitive)
+	// 3. Look up in cached dynamic settings
 	for (const auto& [key, value] : _dynamicWidgetModes) {
 		if (string::iequals(key, iniKey)) {
 			return value;
 		}
 	}
 
-	return kImmersive;
-}
-
-const std::set<std::string>& Settings::GetSubWidgetPaths() const
-{
-	return _subWidgetPaths;
+	return kImmersive;	// Default fallback
 }

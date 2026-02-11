@@ -46,13 +46,21 @@ public:
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
 
-	[[nodiscard]] const std::set<std::string>& GetSubWidgetPaths() const;
+	[[nodiscard]] const std::set<std::string>& GetSubWidgetPaths() const { return _subWidgetPaths; }
 	[[nodiscard]] std::string GetWidgetSource(const std::string& a_path) const;
 
 	[[nodiscard]] const CrosshairSettings& GetCrosshairSettings() const { return _crosshair; }
 	[[nodiscard]] const SneakMeterSettings& GetSneakMeterSettings() const { return _sneakMeter; }
 
 private:
+	using INIFunc = std::function<void(CSimpleIniA&)>;
+
+	void LoadINI(const fs::path& a_defaultPath, const fs::path& a_userPath, INIFunc a_func);
+
+	const fs::path defaultPath{ "Data/MCM/Config/ImmersiveHUD/settings.ini" };
+	const fs::path userPath{ "Data/MCM/Settings/ImmersiveHUD.ini" };
+	const fs::path cachePath{ "Data/MCM/Settings/ImmersiveHUD_Cache.ini" };
+
 	std::uint32_t _toggleKey = 0x2D;
 	bool _holdMode = false;
 	bool _startVisible = false;
