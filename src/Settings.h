@@ -59,7 +59,7 @@ private:
 
 	const fs::path defaultPath{ "Data/MCM/Config/ImmersiveHUD/settings.ini" };
 	const fs::path userPath{ "Data/MCM/Settings/ImmersiveHUD.ini" };
-	const fs::path cachePath{ "Data/MCM/Settings/ImmersiveHUD_Cache.ini" };
+	const fs::path cachePath{ "Data/SKSE/Plugins/ImmersiveHUD_Cache.ini" };
 
 	std::uint32_t _toggleKey = 0x2D;
 	bool _holdMode = false;

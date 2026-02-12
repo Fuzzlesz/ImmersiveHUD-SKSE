@@ -31,6 +31,12 @@ void Settings::LoadINI(const fs::path& a_defaultPath, const fs::path& a_userPath
 // -------------------------------------------------------------------------
 void Settings::Load()
 {
+	// Delete old cache if it exists
+	const fs::path oldCache = "Data/MCM/Settings/ImmersiveHUD_Cache.ini";
+	if (fs::exists(oldCache)) {
+		fs::remove(oldCache);
+	}
+
 	// Use the helper to handle file I/O logic
 	LoadINI(defaultPath, userPath, [&](CSimpleIniA& ini) {
 		const char* sectionHUD = "HUD";
@@ -97,17 +103,8 @@ void Settings::SaveCache()
 	CSimpleIniA cacheIni;
 	cacheIni.SetUnicode();
 
-	// Ensure the directory exists (in case the user hasn't changed an MCM setting yet)
-	try {
-		if (const auto dir = cachePath.parent_path(); !fs::exists(dir)) {
-			fs::create_directories(dir);
-		}
-	} catch (...) {}
-
-	// Rewrite cache to avoid stale entries
 	for (const auto& path : _subWidgetPaths) {
-		std::string source = GetWidgetSource(path);
-		cacheIni.SetValue("PathCache", path.c_str(), source.c_str());
+		cacheIni.SetValue("PathCache", path.c_str(), GetWidgetSource(path).c_str());
 	}
 
 	cacheIni.SaveFile(cachePath.string().c_str());
