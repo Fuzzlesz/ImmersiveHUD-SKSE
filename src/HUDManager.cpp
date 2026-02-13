@@ -1000,7 +1000,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// TESGlobal in esp ensures compass is always hidden if set.
 			if (isCompass && !compat->IsCompassAllowed()) {
 				dInfo.SetVisible(false);
-				dInfo.SetAlpha(0.0);
+				dInfo.SetAlpha(0.0f);
 				elem.SetDisplayInfo(dInfo);
 				continue;
 			}
