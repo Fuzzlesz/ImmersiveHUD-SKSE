@@ -418,9 +418,10 @@ namespace MCMGen
 						existsInIni = true;
 					}
 				}
-
-				if (!existsInIni)
+				if (!existsInIni) {
 					newIniKeysWidgets.push_back(iniKey);
+				}
+
 				finalWidgetsMap[finalID] = CreateEnum(displayName, finalID, help);
 			}
 
