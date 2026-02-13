@@ -721,15 +721,6 @@ void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRu
 	auto hud = ui->GetMenu("HUD Menu");
 	RE::GFxMovieView* hudMovie = (hud && hud->uiMovie) ? hud->uiMovie.get() : nullptr;
 
-	// Detect SkyHUD presence before iterating elements
-	_isSkyHUDActive = false;
-	if (hudMovie) {
-		RE::GFxValue test;
-		if (hudMovie->GetVariable(&test, "_root.HUDMovieBaseInstance.ChargeMeterBaseAlt")) {
-			_isSkyHUDActive = true;
-		}
-	}
-
 	// Scan External Menus
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -989,10 +980,11 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				}
 			}
 
-			// Mutual Exclusion: SkyHUD Combined mode vs Vanilla Left/Right
-			if ((_isSkyHUDActive && (isEnchantLeft || isEnchantRight)) || (!_isSkyHUDActive && isEnchantSkyHUD)) {
+			// SkyHUD alt charge: hide separate left/right meters completely
+			if ((compat->IsSkyHUDAltChargeEnabled() && (isEnchantLeft || isEnchantRight)) ||
+				(!compat->IsSkyHUDAltChargeEnabled() && isEnchantSkyHUD)) {
 				dInfo.SetVisible(false);
-				dInfo.SetAlpha(0.0);
+				dInfo.SetAlpha(0.0f);
 				elem.SetDisplayInfo(dInfo);
 				continue;
 			}

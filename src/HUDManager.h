@@ -25,9 +25,6 @@ public:
 	// Visibility State Helpers
 	bool ShouldHideHUD();
 
-	// Status Getters
-	[[nodiscard]] bool IsSkyHUDActive() const { return _isSkyHUDActive; }
-
 	// Session State
 	void ResetSession();
 

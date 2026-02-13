@@ -31,6 +31,28 @@ void Compat::InitExternalData()
 	if (g_DisableCompass || g_DisableSneak || g_DisableiHUD) {
 		logger::info("Linked generic HUD control globals from ImmersiveHUD.esp");
 	}
+
+	// SkyHUD alt charge detection
+	const fs::path skyhudPath = "Data/Interface/skyhud/skyhud.txt";
+	if (fs::exists(skyhudPath)) {
+		CSimpleIniA ini;
+		ini.SetUnicode();
+		if (ini.LoadFile(skyhudPath.string().c_str()) >= 0) {
+			int val = ini.GetLongValue("Interface", "bAltCharge", -1);
+			if (val == -1) {
+				val = ini.GetLongValue("Gameplay", "bAltCharge", -1);
+			}
+			_skyHUDAltCharge = (val == 1);
+			if (_skyHUDAltCharge) {
+				logger::info("SkyHUD bAltCharge=1 detected");
+			}
+		}
+	}
+}
+
+bool Compat::IsSkyHUDAltChargeEnabled() const
+{
+	return _skyHUDAltCharge;
 }
 
 void Compat::ManageSmoothCamControl(bool a_shouldBlock)

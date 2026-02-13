@@ -334,15 +334,10 @@ namespace MCMGen
 			std::vector<ElementSortEntry> validElements;
 			std::unordered_set<std::string> processedPaths;
 
-			// Check for SkyHUD presence to conditionally filter the combined meter
-			bool isSkyHUD = HUDManager::GetSingleton()->IsSkyHUDActive();
+			auto compat = Compat::GetSingleton();
+			bool altChargeActive = compat->IsSkyHUDAltChargeEnabled();
 
 			for (const auto& def : HUDElements::Get()) {
-				// Conditional Filter: Skip SkyHUD Combined meter if SkyHUD not active
-				if (strcmp(def.id, "iMode_EnchantCombined") == 0 && !isSkyHUD) {
-					continue;
-				}
-
 				std::string iniKey = def.id;
 				std::string mcmID = iniKey + ":HUDElements";
 				std::string label = def.label;
@@ -350,6 +345,17 @@ namespace MCMGen
 
 				if (!def.paths.empty()) {
 					help += def.paths[0];
+				}
+
+				// Conditional: show combined only if alt charge active, otherwise left/right
+				if (altChargeActive) {
+					if (iniKey == "iMode_EnchantLeft" || iniKey == "iMode_EnchantRight") {
+						continue;
+					}
+				} else {
+					if (iniKey == "iMode_EnchantCombined") {
+						continue;
+					}
 				}
 
 				if (iniLoaded) {

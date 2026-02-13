@@ -37,6 +37,8 @@ public:
 	bool IsPlayerAttacking(RE::PlayerCharacter* a_player);
 	bool IsSpellContextual(RE::MagicItem* a_magicItem);
 
+	bool IsSkyHUDAltChargeEnabled() const;
+
 	// API Handles
 	SmoothCamAPI::IVSmoothCam3* g_SmoothCam = nullptr;
 	TDM_API::IVTDM2* g_TDM = nullptr;
@@ -52,4 +54,5 @@ public:
 private:
 	bool _hasSmoothCamCrosshairControl = false;
 	bool _hasSmoothCamStealthControl = false;
+	bool _skyHUDAltCharge = false;
 };
