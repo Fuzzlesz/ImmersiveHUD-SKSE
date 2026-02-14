@@ -1,6 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/Exit-9B/MCM-Helper/main/docs/config.schema.json",
-  "cursorFillMode": "topToBottom",
   "displayName": "$fzIH_ModName",
   "modName": "ImmersiveHUD",
   "pages": [
@@ -86,9 +85,26 @@
           "type": "empty"
         },
         {
-          "help": "$fzIH_HelpFadeSpeed",
-          "id": "iFadeSpeed:HUD",
-          "text": "$fzIH_FadeSpeed",
+          "help": "$fzIH_HelpFadeInSpeed",
+          "id": "iFadeInSpeed:HUD",
+          "text": "$fzIH_FadeInSpeed",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 10,
+            "formatString": "{0}",
+            "max": 20,
+            "min": 1,
+            "sourceType": "ModSettingInt",
+            "step": 1
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "help": "$fzIH_HelpFadeOutSpeed",
+          "id": "iFadeOutSpeed:HUD",
+          "text": "$fzIH_FadeOutSpeed",
           "type": "slider",
           "valueOptions": {
             "defaultValue": 5,

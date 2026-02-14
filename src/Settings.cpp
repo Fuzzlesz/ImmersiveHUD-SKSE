@@ -2,10 +2,10 @@
 #include "HUDElements.h"
 #include "Utils.h"
 
-// -------------------------------------------------------------------------
-// Helper: Loads a Default INI, then overlays a User INI, then runs callback
-// -------------------------------------------------------------------------
-void Settings::LoadINI(const fs::path& a_defaultPath, const fs::path& a_userPath, INIFunc a_func)
+	// -------------------------------------------------------------------------
+	// Helper: Loads a Default INI, then overlays a User INI, then runs callback
+	// -------------------------------------------------------------------------
+	void Settings::LoadINI(const fs::path& a_defaultPath, const fs::path& a_userPath, INIFunc a_func)
 {
 	CSimpleIniA ini;
 	ini.SetUnicode();
@@ -46,7 +46,13 @@ void Settings::Load()
 		_startVisible = ini.GetBoolValue(sectionHUD, "bStartVisible", false);
 		_alwaysShowInCombat = ini.GetBoolValue(sectionHUD, "bShowInCombat", false);
 		_alwaysShowWeaponDrawn = ini.GetBoolValue(sectionHUD, "bShowWeaponDrawn", false);
-		_fadeSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeSpeed", 5));
+
+		// Fallback for migration: If iFadeSpeed exists but split keys don't, use it.
+		// Otherwise default.
+		long legacySpeed = ini.GetLongValue(sectionHUD, "iFadeSpeed", 5);
+		_fadeInSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeInSpeed", legacySpeed));
+		_fadeOutSpeed = static_cast<float>(ini.GetLongValue(sectionHUD, "iFadeOutSpeed", legacySpeed));
+
 		_displayDuration = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fDisplayDuration", 0.0));
 		_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
 		_logMenuFlags = ini.GetBoolValue(sectionHUD, "bLogMenuFlags", false);
@@ -194,5 +200,5 @@ int Settings::GetWidgetMode(const std::string& a_rawPath) const
 		}
 	}
 
-	return kImmersive;	// Default fallback
+	return kImmersive;  // Default fallback
 }

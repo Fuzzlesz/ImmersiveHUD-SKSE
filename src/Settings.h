@@ -1,6 +1,6 @@
 #pragma once
 
-class Settings : public ISingleton<Settings>
+	class Settings : public ISingleton<Settings>
 {
 public:
 	enum WidgetMode
@@ -39,7 +39,8 @@ public:
 	[[nodiscard]] bool IsStartVisible() const { return _startVisible; }
 	[[nodiscard]] bool IsAlwaysShowInCombat() const { return _alwaysShowInCombat; }
 	[[nodiscard]] bool IsAlwaysShowWeaponDrawn() const { return _alwaysShowWeaponDrawn; }
-	[[nodiscard]] float GetFadeSpeed() const { return _fadeSpeed; }
+	[[nodiscard]] float GetFadeInSpeed() const { return _fadeInSpeed; }
+	[[nodiscard]] float GetFadeOutSpeed() const { return _fadeOutSpeed; }
 	[[nodiscard]] float GetDisplayDuration() const { return _displayDuration; }
 	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
 	[[nodiscard]] bool IsMenuFlagLoggingEnabled() const { return _logMenuFlags; }
@@ -66,7 +67,8 @@ private:
 	bool _startVisible = false;
 	bool _alwaysShowInCombat = false;
 	bool _alwaysShowWeaponDrawn = false;
-	float _fadeSpeed = 5.0f;
+	float _fadeInSpeed = 10.0f;
+	float _fadeOutSpeed = 5.0f;
 	float _displayDuration = 0.0f;
 	bool _dumpHUD = false;
 	bool _logMenuFlags = false;

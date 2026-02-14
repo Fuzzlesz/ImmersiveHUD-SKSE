@@ -7,10 +7,10 @@
 #include "Utils.h"
 
 // ==========================================
-// Utility Classes
-// ==========================================
+	// Utility Classes
+	// ==========================================
 
-namespace
+	namespace
 {
 	// Aggressively forces any DisplayObject found to be visible and at 100 alpha.
 	// Used to fix vanilla enchantment charge meter visibility issues, required for unlabeled children.
@@ -403,7 +403,7 @@ void HUDManager::Update(float a_delta)
 
 	// Sneak Meter Target Alpha
 	float targetSneak = 0.0f;
-	float sneakFadeSpeed = settings->GetFadeSpeed();
+	float sneakFadeSpeed = settings->GetFadeOutSpeed();
 	if (isSneaking && compat->IsSneakAllowed()) {
 		if (settings->GetSneakMeterSettings().enabled) {
 			// Contextual Authority: detection level math mixed with global toggle state
@@ -418,6 +418,10 @@ void HUDManager::Update(float a_delta)
 			targetSneak = std::max(detectionAlpha, _currentAlpha);
 			// ActionScript scaling (Detection modes only).
 			targetSneak = (targetSneak * 0.01f * 90.0f);
+
+			// Determine context speed
+			sneakFadeSpeed = (targetSneak > _ctxSneakAlpha) ? settings->GetFadeInSpeed() : settings->GetFadeOutSpeed();
+
 		} else {
 			// Manual Authority: follow linear state synchronization trackers
 			int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
@@ -450,6 +454,7 @@ void HUDManager::Update(float a_delta)
 				targetSneak = _currentAlpha;
 				break;  // kImmersive
 			}
+			sneakFadeSpeed = (targetSneak > _ctxSneakAlpha) ? settings->GetFadeInSpeed() : settings->GetFadeOutSpeed();
 		}
 	} else {
 		// Player stood up or globally disabled: target hard 0
@@ -498,11 +503,15 @@ void HUDManager::Update(float a_delta)
 
 	// 3. Mixed Math Calculations (Skip if a_delta is 0)
 	if (a_delta > 0.0f) {
-		const float fadeSpeed = settings->GetFadeSpeed();
-		const float change = fadeSpeed * (a_delta * 60.0f);
+		const float speedIn = settings->GetFadeInSpeed();
+		const float speedOut = settings->GetFadeOutSpeed();
+		const float changeIn = speedIn * (a_delta * 60.0f);
+		const float changeOut = speedOut * (a_delta * 60.0f);
 
 		// Helper lambda for consistent linear transitions
 		auto UpdateLinear = [&](float& a_currentAlpha, float a_targetAlpha) {
+			float change = (a_currentAlpha < a_targetAlpha) ? changeIn : changeOut;
+
 			if (std::abs(a_currentAlpha - a_targetAlpha) <= change) {
 				a_currentAlpha = a_targetAlpha;
 			} else if (a_currentAlpha < a_targetAlpha) {
@@ -524,7 +533,8 @@ void HUDManager::Update(float a_delta)
 		UpdateLinear(_lockedOnAlpha, targetLockedOn);
 
 		// Crosshair: Lerp Math (Smooth Feel)
-		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * fadeSpeed);
+		float ctxSpeed = (targetCtx > _ctxAlpha) ? speedIn : speedOut;
+		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * ctxSpeed);
 		if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
 			_ctxAlpha = targetCtx;
 		}
