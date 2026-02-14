@@ -1,10 +1,10 @@
 #include "Compat.h"
 
-// ==========================================
-// Compatibility Implementation
-// ==========================================
+	// ==========================================
+	// Compatibility Implementation
+	// ==========================================
 
-void Compat::InitExternalData()
+	void Compat::InitExternalData()
 {
 	auto dataHandler = RE::TESDataHandler::GetSingleton();
 	if (!dataHandler) {
@@ -261,16 +261,22 @@ bool Compat::IsPlayerAttacking(RE::PlayerCharacter* a_player)
 	if (!a_player) {
 		return false;
 	}
+
 	auto equipped = a_player->GetEquippedObject(true);
 	auto attackState = a_player->actorState1.meleeAttackState;
 
 	if (equipped && equipped->GetFormType() == RE::FormType::Weapon) {
 		auto weapon = equipped->As<RE::TESObjectWEAP>();
+
 		if (weapon->IsBow()) {
-			return attackState >= RE::ATTACK_STATE_ENUM::kBowAttached && attackState <= RE::ATTACK_STATE_ENUM::kBowNextAttack;
+			return attackState >= RE::ATTACK_STATE_ENUM::kBowDraw &&
+			       attackState <= RE::ATTACK_STATE_ENUM::kBowFollowThrough;
 		}
+
 		if (weapon->IsCrossbow()) {
-			return attackState >= RE::ATTACK_STATE_ENUM::kBowDraw && attackState <= RE::ATTACK_STATE_ENUM::kNextAttack;
+			return attackState == RE::ATTACK_STATE_ENUM::kBowDrawn ||
+			       attackState == RE::ATTACK_STATE_ENUM::kBowReleasing ||
+			       attackState == RE::ATTACK_STATE_ENUM::kBowReleased;
 		}
 	}
 	return false;
