@@ -182,8 +182,6 @@ bool Compat::IsPlayerWeaponDrawn()
 }
 
 bool Compat::CameraStateCheck()
-// We return true here to Force-Hide the HUD (ShouldHideHUD returns true)
-// This overrides even elements set to "Visible" in the MCM.
 {
 	auto camera = RE::PlayerCamera::GetSingleton();
 	if (!camera || !camera->currentState) {
