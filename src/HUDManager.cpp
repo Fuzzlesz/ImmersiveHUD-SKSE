@@ -115,10 +115,6 @@ void HUDManager::InstallHooks()
 	stl::write_vfunc<RE::HUDMenu, HUDMenuAdvanceMovieHook>();
 	stl::write_vfunc<RE::StealthMeter, StealthMeterHook>();
 
-	// Load settings first so we can read the preference
-	Settings::GetSingleton()->Load();
-	_userWantsVisible = Settings::GetSingleton()->IsStartVisible();
-
 	_installed = true;
 
 	// Initial state load and snap (Hard Reset)
