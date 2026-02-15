@@ -262,21 +262,31 @@ bool Compat::IsPlayerAttacking(RE::PlayerCharacter* a_player)
 		return false;
 	}
 
-	auto equipped = a_player->GetEquippedObject(true);
 	auto attackState = a_player->actorState1.meleeAttackState;
 
-	if (equipped && equipped->GetFormType() == RE::FormType::Weapon) {
-		auto weapon = equipped->As<RE::TESObjectWEAP>();
+	for (bool isLeft : { false, true }) {
+		auto equipped = a_player->GetEquippedObject(isLeft);
 
-		if (weapon->IsBow()) {
-			return attackState >= RE::ATTACK_STATE_ENUM::kBowDraw &&
-			       attackState <= RE::ATTACK_STATE_ENUM::kBowFollowThrough;
-		}
+		if (equipped && equipped->GetFormType() == RE::FormType::Weapon) {
+			auto weapon = equipped->As<RE::TESObjectWEAP>();
 
-		if (weapon->IsCrossbow()) {
-			return attackState == RE::ATTACK_STATE_ENUM::kBowDrawn ||
-			       attackState == RE::ATTACK_STATE_ENUM::kBowReleasing ||
-			       attackState == RE::ATTACK_STATE_ENUM::kBowReleased;
+			if (weapon->IsBow()) {
+				if (attackState >= RE::ATTACK_STATE_ENUM::kBowDraw &&
+					attackState <= RE::ATTACK_STATE_ENUM::kBowFollowThrough) {
+					return true;
+				}
+			} else if (weapon->IsCrossbow()) {
+				if (attackState == RE::ATTACK_STATE_ENUM::kBowDrawn ||
+					attackState == RE::ATTACK_STATE_ENUM::kBowReleasing ||
+					attackState == RE::ATTACK_STATE_ENUM::kBowReleased) {
+					return true;
+				}
+
+				// Crossbow Aiming is considered a Blocking state
+				if (a_player->IsBlocking()) {
+					return true;
+				}
+			}
 		}
 	}
 	return false;
