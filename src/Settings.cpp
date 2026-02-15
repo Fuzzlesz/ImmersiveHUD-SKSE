@@ -93,6 +93,12 @@ void Settings::Load()
 		cacheIni.SetUnicode();
 
 		if (cacheIni.LoadFile(cachePath.string().c_str()) >= 0) {
+			long cachedVer = cacheIni.GetLongValue("General", "iCacheVersion", 0);
+			if (cachedVer != kCacheVersion) {
+				logger::info("Cache version mismatch (Expected: {}, Found: {}). Invalidating cache.", kCacheVersion, cachedVer);
+				return;
+			}
+
 			CSimpleIniA::TNamesDepend cacheKeys;
 			cacheIni.GetAllKeys("PathCache", cacheKeys);
 
@@ -114,6 +120,8 @@ void Settings::SaveCache()
 {
 	CSimpleIniA cacheIni;
 	cacheIni.SetUnicode();
+
+	cacheIni.SetLongValue("General", "iCacheVersion", kCacheVersion);
 
 	for (const auto& path : _subWidgetPaths) {
 		cacheIni.SetValue("PathCache", path.c_str(), GetWidgetSource(path).c_str());

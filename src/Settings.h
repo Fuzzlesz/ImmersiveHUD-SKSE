@@ -3,6 +3,8 @@
 	class Settings : public ISingleton<Settings>
 {
 public:
+	static constexpr long kCacheVersion = 2; 
+
 	enum WidgetMode
 	{
 		kVisible = 0,
