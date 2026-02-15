@@ -20,6 +20,7 @@ public:
 	struct CrosshairSettings
 	{
 		bool enabled{ true };
+		bool hideWhileAiming{ false };
 	};
 
 	struct SneakMeterSettings
@@ -44,6 +45,11 @@ public:
 	[[nodiscard]] float GetDisplayDuration() const { return _displayDuration; }
 	[[nodiscard]] bool IsDumpHUDEnabled() const { return _dumpHUD; }
 	[[nodiscard]] bool IsMenuFlagLoggingEnabled() const { return _logMenuFlags; }
+
+	[[nodiscard]] float GetHUDOpacityMin() const { return _hudOpacityMin; }
+	[[nodiscard]] float GetHUDOpacityMax() const { return _hudOpacityMax; }
+	[[nodiscard]] float GetContextOpacityMin() const { return _contextOpacityMin; }
+	[[nodiscard]] float GetContextOpacityMax() const { return _contextOpacityMax; }
 
 	[[nodiscard]] int GetWidgetMode(const std::string& a_rawPath) const;
 
@@ -72,6 +78,11 @@ private:
 	float _displayDuration = 0.0f;
 	bool _dumpHUD = false;
 	bool _logMenuFlags = false;
+
+	float _hudOpacityMin = 0.0f;
+	float _hudOpacityMax = 100.0f;
+	float _contextOpacityMin = 0.0f;
+	float _contextOpacityMax = 100.0f;
 
 	CrosshairSettings _crosshair;
 	SneakMeterSettings _sneakMeter;

@@ -57,7 +57,13 @@ void Settings::Load()
 		_dumpHUD = ini.GetBoolValue(sectionHUD, "bDumpHUD", false);
 		_logMenuFlags = ini.GetBoolValue(sectionHUD, "bLogMenuFlags", false);
 
+		_hudOpacityMin = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fHUDOpacityMin", 0.0));
+		_hudOpacityMax = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fHUDOpacityMax", 100.0));
+		_contextOpacityMin = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fContextOpacityMin", 0.0));
+		_contextOpacityMax = static_cast<float>(ini.GetDoubleValue(sectionHUD, "fContextOpacityMax", 100.0));
+
 		_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
+		_crosshair.hideWhileAiming = ini.GetBoolValue("Crosshair", "bHideWhileAiming", false);
 		_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
 
 		// --- Map Vanilla HUD Elements ---

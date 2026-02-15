@@ -69,7 +69,14 @@
           }
         },
         {
-          "type": "empty"
+          "help": "$fzIH_HelpCrosshairAim",
+          "id": "bHideWhileAiming:Crosshair",
+          "text": "$fzIH_CrosshairAim",
+          "type": "toggle",
+          "valueOptions": {
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
+          }
         },
         {
           "help": "$fzIH_HelpStartVisible",
@@ -82,7 +89,18 @@
           }
         },
         {
-          "type": "empty"
+          "help": "$fzIH_HelpContextOpMin",
+          "id": "fContextOpacityMin:HUD",
+          "text": "$fzIH_ContextOpMin",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 0,
+            "formatString": "{0}%",
+            "max": 100,
+            "min": 0,
+            "sourceType": "ModSettingFloat",
+            "step": 1
+          }
         },
         {
           "help": "$fzIH_HelpFadeInSpeed",
@@ -99,7 +117,18 @@
           }
         },
         {
-          "type": "empty"
+          "help": "$fzIH_HelpContextOpMax",
+          "id": "fContextOpacityMax:HUD",
+          "text": "$fzIH_ContextOpMax",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 100,
+            "formatString": "{0}%",
+            "max": 100,
+            "min": 0,
+            "sourceType": "ModSettingFloat",
+            "step": 1
+          }
         },
         {
           "help": "$fzIH_HelpFadeOutSpeed",
@@ -112,6 +141,40 @@
             "max": 20,
             "min": 1,
             "sourceType": "ModSettingInt",
+            "step": 1
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "help": "$fzIH_HelpHUDOpMin",
+          "id": "fHUDOpacityMin:HUD",
+          "text": "$fzIH_HUDOpMin",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 0,
+            "formatString": "{0}%",
+            "max": 100,
+            "min": 0,
+            "sourceType": "ModSettingFloat",
+            "step": 1
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "help": "$fzIH_HelpHUDOpMax",
+          "id": "fHUDOpacityMax:HUD",
+          "text": "$fzIH_HUDOpMax",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 100,
+            "formatString": "{0}%",
+            "max": 100,
+            "min": 0,
+            "sourceType": "ModSettingFloat",
             "step": 1
           }
         },

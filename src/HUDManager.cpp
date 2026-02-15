@@ -8,11 +8,11 @@
 
 // ==========================================
 	// Utility Classes
-	// ==========================================
+// ==========================================
 
-	namespace
+namespace
 {
-	// Aggressively forces any DisplayObject found to be visible and at 100 alpha.
+	// Aggressively forces any DisplayObject found to be visible and at 100 alpha (or max opacity).
 	// Used to fix vanilla enchantment charge meter visibility issues, required for unlabeled children.
 	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
 	{
@@ -345,7 +345,12 @@ void HUDManager::Update(float a_delta)
 	const bool isTDM = compat->IsTDMActive();
 	const bool isBTPS = compat->IsBTPSActive();
 
-	// 1. Determine Visibility Targets
+	// Opacity Configuration
+	const float hudMax = settings->GetHUDOpacityMax();
+	const float hudMin = settings->GetHUDOpacityMin();
+	const float ctxMax = settings->GetContextOpacityMax();
+	const float ctxMin = settings->GetContextOpacityMin();
+
 	bool shouldBeVisible = _userWantsVisible;
 	if (!shouldBeVisible) {
 		if ((settings->IsAlwaysShowInCombat() && isInCombat) ||
@@ -353,15 +358,15 @@ void HUDManager::Update(float a_delta)
 			shouldBeVisible = true;
 		}
 	}
-	_targetAlpha = shouldBeVisible ? 100.0f : 0.0f;
+	_targetAlpha = shouldBeVisible ? hudMax : hudMin;
 
 	// Per-element state targets for fancy linear fading
-	float targetInterior = isInterior ? 100.0f : 0.0f;
-	float targetExterior = !isInterior ? 100.0f : 0.0f;
-	float targetCombat = isInCombat ? 100.0f : 0.0f;
-	float targetNotInCombat = !isInCombat ? 100.0f : 0.0f;
-	float targetWeapon = isWeaponDrawn ? 100.0f : 0.0f;
-	float targetLockedOn = isLockedOn ? 100.0f : 0.0f;
+	float targetInterior = isInterior ? hudMax : hudMin;
+	float targetExterior = !isInterior ? hudMax : hudMin;
+	float targetCombat = isInCombat ? hudMax : hudMin;
+	float targetNotInCombat = !isInCombat ? hudMax : hudMin;
+	float targetWeapon = isWeaponDrawn ? hudMax : hudMin;
+	float targetLockedOn = isLockedOn ? hudMax : hudMin;
 
 	// Calculate Contextual States
 	// Action: Aiming a Bow, Casting an Aimed Spell.
@@ -370,10 +375,12 @@ void HUDManager::Update(float a_delta)
 	bool isLookActive = compat->IsCrosshairTargetValid() && !isBTPS;
 
 	// Crosshair Target Alpha
-	float targetCtx = 0.0f;
+	float targetCtx = ctxMin;
 	if (settings->GetCrosshairSettings().enabled) {
+		bool isHiddenByAiming = settings->GetCrosshairSettings().hideWhileAiming && isActionActive;
+
 		// Visibility Authority: Merge contextual states.
-		bool shouldDrawCrosshair = (isActionActive || isLookActive);
+		bool shouldDrawCrosshair = (isActionActive || isLookActive) && !isHiddenByAiming;
 
 		// SmoothCam API: Request control (block) to hide, release (unblock) to draw
 		if (isSmoothCam && !shouldHide) {
@@ -381,20 +388,22 @@ void HUDManager::Update(float a_delta)
 		}
 
 		// Alpha Calculation
-		if (shouldDrawCrosshair) {
+		if (isHiddenByAiming) {
+			targetCtx = 0.0f;
+		} else if (shouldDrawCrosshair) {
 			if (isTDM) {
 				// TDM handles rendering; vanilla is suppressed
 				targetCtx = 0.0f;
 			} else {
 				// Target 100% for active use/SmoothCam, 50% for passive interaction
 				if (isActionActive || isSmoothCam) {
-					targetCtx = 100.0f;
+					targetCtx = ctxMax;
 				} else {
-					targetCtx = 50.0f;
+					targetCtx = std::max(ctxMin, ctxMax * 0.5f);
 				}
 			}
 		} else {
-			targetCtx = 0.0f;
+			targetCtx = ctxMin;
 		}
 	} else {
 		// If Contextual Crosshair is disabled in settings, link it to the global toggle
@@ -416,8 +425,12 @@ void HUDManager::Update(float a_delta)
 			}
 
 			targetSneak = std::max(detectionAlpha, _currentAlpha);
-			// ActionScript scaling (Detection modes only).
-			targetSneak = (targetSneak * 0.01f * 90.0f);
+
+			// Normalize raw detection (0-100) to a 0.0-1.0 scalar.
+			float scalar = std::clamp(targetSneak / 100.0f, 0.0f, 1.0f);
+
+			// Map the scalar to the Context Opacity Range [Min, Max].
+			targetSneak = ctxMin + (scalar * (ctxMax - ctxMin));
 
 			// Determine context speed
 			sneakFadeSpeed = (targetSneak > _ctxSneakAlpha) ? settings->GetFadeInSpeed() : settings->GetFadeOutSpeed();
@@ -427,7 +440,7 @@ void HUDManager::Update(float a_delta)
 			int widgetMode = settings->GetWidgetMode("_root.HUDMovieBaseInstance.StealthMeterInstance");
 			switch (widgetMode) {
 			case Settings::kVisible:
-				targetSneak = 100.0f;
+				targetSneak = hudMax;
 				break;
 			case Settings::kInterior:
 				targetSneak = targetInterior;
@@ -467,8 +480,8 @@ void HUDManager::Update(float a_delta)
 	const bool leftEnch = compat->HasEnchantedWeapon(true);
 	const bool rightEnch = compat->HasEnchantedWeapon(false);
 
-	float targetEnL = (weaponsActive && leftEnch) ? 100.0f : 0.0f;
-	float targetEnR = (weaponsActive && rightEnch) ? 100.0f : 0.0f;
+	float targetEnL = (weaponsActive && leftEnch) ? hudMax : hudMin;
+	float targetEnR = (weaponsActive && rightEnch) ? hudMax : hudMin;
 
 	// Dual-wield handshaking: forces synchronous fading regardless of equipment delay.
 	if (weaponsActive && leftEnch && rightEnch) {
@@ -908,6 +921,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const auto ui = RE::UI::GetSingleton();
 	const bool isConsoleOpen = ui && ui->IsMenuOpen(RE::Console::MENU_NAME);
 
+	const float hudMax = settings->GetHUDOpacityMax();
+
 	// Management of vanilla elements; target 0 alpha while menus are open to respect engine hiding.
 	const float managedAlpha = menuOpen ? 0.0f : a_globalAlpha;
 	const float alphaL = menuOpen ? 0.0f : _enchantAlphaL;
@@ -1105,7 +1120,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				shouldBeVisible = (targetAlpha > 0.01);
 			} else if (mode == Settings::kVisible) {
 				shouldBeVisible = !menuOpen;
-				targetAlpha = menuOpen ? 0.0 : 100.0;
+				targetAlpha = menuOpen ? 0.0 : hudMax;
 			} else {
 				if (isCrosshair) {
 					float ctxBased = (menuOpen ? 0.0f : _ctxAlpha);
@@ -1215,7 +1230,7 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			dInfo.SetAlpha(0.0);
 		} else if (mode == Settings::kVisible) {
 			dInfo.SetVisible(true);
-			dInfo.SetAlpha(100.0);
+			dInfo.SetAlpha(hudMax);
 		} else if (mode == Settings::kInterior) {
 			dInfo.SetVisible(interiorAlpha > 0.01);
 			dInfo.SetAlpha(interiorAlpha);
@@ -1260,6 +1275,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	const float weaponAlpha = menuOpen ? 0.0f : _weaponAlpha;
 	const float notInCombatAlpha = menuOpen ? 0.0f : _notInCombatAlpha;
 	const float lockedOnAlpha = menuOpen ? 0.0f : _lockedOnAlpha;
+	const float hudMax = settings->GetHUDOpacityMax();
 
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
@@ -1306,7 +1322,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 		// For other modes, we set the target alpha blindly
 		RE::GFxValue::DisplayInfo dInfo;
 		if (mode == Settings::kVisible) {
-			dInfo.SetAlpha(100.0);
+			dInfo.SetAlpha(hudMax);
 		} else if (mode == Settings::kHidden) {
 			dInfo.SetAlpha(0.0);
 		} else if (mode == Settings::kInterior) {
