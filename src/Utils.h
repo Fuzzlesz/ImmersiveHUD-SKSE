@@ -2,6 +2,9 @@
 
 namespace Utils
 {
+	// Checks if a swf file is on the blocklist
+	bool IsIgnoredUrl(const std::string& a_url);
+
 	// Converts "_root.WidgetContainer.10" -> "_root_WidgetContainer_10".
 	std::string SanitizeName(const std::string& a_name);
 

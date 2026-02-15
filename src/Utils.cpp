@@ -18,6 +18,29 @@ namespace Utils
 	static std::unordered_set<std::string> g_interactiveSources;
 	static std::mutex g_interactiveSourceLock;
 
+ 	// Hardcoded blocked swf files.
+	bool IsIgnoredUrl(const std::string& a_url)
+	{
+		std::string lowerUrl = a_url;
+		std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
+
+		// Exclude Compass Navigation Overhaul compass for harmless settings conflict.
+		// QuestItemList visibility is tied to the compass already, we don't want control.
+		if (lowerUrl.find("compass.swf") != std::string::npos ||
+			lowerUrl.find("questitemlist.swf") != std::string::npos ||
+
+			// Exclude moreHUD icon swf that we don't need spamming logs/cache.
+			lowerUrl.find("baseicons.swf") != std::string::npos ||
+
+			// Exclude Sneak Vignette mod to avoid issues.
+			lowerUrl.find("sneakvignette.swf") != std::string::npos ||
+			lowerUrl.find("sneakvignettedummy.swf") != std::string::npos) {
+			return true;
+		}
+
+		return false;
+	}
+
 	// ==========================================
 	// String & Path Helpers
 	// ==========================================
@@ -389,19 +412,13 @@ namespace Utils
 			RE::GFxValue urlVal;
 			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
 				std::string url = urlVal.GetString();
-				std::string lowerUrl = url;
-				std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
 
-				// Exclude Compass Navigation Overhaul compass for harmless settings conflict.
-				// QuestItemList visibility is tied to the compass already, we don't want control.
-				if (lowerUrl.find("compass.swf") != std::string::npos ||
-					lowerUrl.find("questitemlist.swf") != std::string::npos ||
-
-					// Exclude Sneak Vignette mod to avoid issues.
-					lowerUrl.find("sneakvignette.swf") != std::string::npos ||
-					lowerUrl.find("sneakvignettedummy.swf") != std::string::npos) {
+				if (IsIgnoredUrl(url)) {
 					return;
 				}
+
+				std::string lowerUrl = url;
+				std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
 
 				// If it's not the vanilla HUD, add it to settings.
 				bool isVanilla = (lowerUrl.find("hudmenu.swf") != std::string::npos);
