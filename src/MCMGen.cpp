@@ -146,6 +146,8 @@ namespace MCMGen
 			std::unordered_set<std::string> previousJsonIDs;
 			// Track Sources present in the previous session's JSON (to detect index shifts)
 			std::unordered_set<std::string> previousJsonSources;
+			// Track Source -> IDs relationship from JSON to suppress "Index Shift" spam for multi-instance widgets
+			std::map<std::string, std::vector<std::string>> previousJsonSourceToIDs;
 
 			// Harvest potential orphans (current settings in the JSON)
 			// We map Source -> List of Orphans
@@ -208,6 +210,8 @@ namespace MCMGen
 								previousJsonIDs.insert(rawID);
 								// Register the source so we know this mod was already installed
 								previousJsonSources.insert(sourceStr);
+								// Map Source to ID for anchor detection
+								previousJsonSourceToIDs[sourceStr].push_back(rawID);
 
 								// Harvest Orphan Candidate
 								// We grab the INI key from the JSON ID (strip ":Widgets")
@@ -319,10 +323,31 @@ namespace MCMGen
 					}
 
 					// Check if the Source was already present (Index Shift vs New Mod).
-					// If the source exists but the specific ID changed (e.g. .19 -> .22), it is an index shift.
-					// This does not require a restart because settings are resolved via Source.
 					if (previousJsonSources.contains(src)) {
-						logger::info("Widget index shift detected: {} [Source: {}]. Updating config without status change.", path, src);
+						// Index Shift or Additional Instance Logic:
+						// If the Source file is known, we check if at least one ID from the JSON for this source
+						// is currently active in memory. If an anchor exists, this is just a multi-instance widget.
+						bool hasAnchor = false;
+						if (auto it = previousJsonSourceToIDs.find(src); it != previousJsonSourceToIDs.end()) {
+							for (const auto& oldID : it->second) {
+								if (activePaths.contains(oldID)) {
+									// Double check source match to prevent collisions with generic names
+									if (settings->GetWidgetSource(oldID) == src) {
+										hasAnchor = true;
+										break;
+									}
+								}
+							}
+						}
+
+						if (hasAnchor) {
+							// Mod is already known and grouped; this is just another instance (e.g. Clock instance #2).
+							// We silence this to prevent log spam.
+						} else {
+							// All previous IDs for this source are gone, but the source is now at a new ID.
+							// This is a legitimate shift (e.g. version update or SkyUI re-ordering).
+							logger::info("Widget index shift detected: {} [Source: {}]. Updating config without status change.", path, src);
+						}
 					} else {
 						logger::info("New widget detected: {} [Source: {}]", path, src);
 						foundNewWidgetInJson = true;
