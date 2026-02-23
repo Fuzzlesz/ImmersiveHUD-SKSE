@@ -1,24 +1,24 @@
 #pragma once
 
-namespace Utils
+	namespace Utils
 {
 	// Checks if a swf file is on the blocklist
-	bool IsIgnoredUrl(const std::string& a_url);
+	bool IsIgnoredUrl(std::string_view a_url);
 
 	// Converts "_root.WidgetContainer.10" -> "_root_WidgetContainer_10".
-	std::string SanitizeName(const std::string& a_name);
+	std::string SanitizeName(std::string_view a_name);
 
 	// Decodes URL encoded strings (e.g. "%20" -> " ").
-	std::string UrlDecode(const std::string& a_src);
+	std::string UrlDecode(std::string_view a_src);
 
 	// Extract "meter" from "Interface/skyui/meter.swf".
-	std::string ExtractFilename(std::string a_path);
+	std::string ExtractFilename(std::string_view a_path);
 
 	// Central logic to determine the human-readable name for the MCM.
-	std::string GetWidgetDisplayName(const std::string& a_source);
+	std::string GetWidgetDisplayName(std::string_view a_source);
 
 	// Checks if a menu name corresponds to a vanilla System Menu (Map, Inventory, etc.)
-	bool IsSystemMenu(const std::string& a_menuName);
+	bool IsSystemMenu(std::string_view a_menuName);
 
 	// Helper to safely extract the _url member from a MovieView
 	std::string GetMenuURL(RE::GPtr<RE::GFxMovieView> a_movie);
@@ -31,7 +31,7 @@ namespace Utils
 	std::string GetMenuFlags(RE::IMenu* a_menu);
 
 	// Log flags (Now uses GetMenuFlags internally)
-	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu);
+	void LogMenuFlags(std::string_view a_name, RE::IMenu* a_menu);
 
 	// Registry for Interactive Sources (SWF files detected as interactive)
 	// Used to prune config entries even if the menu is closed.

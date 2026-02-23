@@ -5,7 +5,7 @@
 namespace Utils
 {
 	// Blocklist to help against recursion and snagging junk/crashing.
-	static const std::unordered_set<std::string> kDiscoveryBlockList = {
+	static const std::unordered_set<std::string_view> kDiscoveryBlockList = {
 		"markerData",
 		"widgetLoaderContainer",
 		"aCompassMarkerList",
@@ -18,10 +18,12 @@ namespace Utils
 	static std::unordered_set<std::string> g_interactiveSources;
 	static std::mutex g_interactiveSourceLock;
 
- 	// Hardcoded blocked swf files.
-	bool IsIgnoredUrl(const std::string& a_url)
+	// Hardcoded blocked swf files.
+	bool IsIgnoredUrl(std::string_view a_url)
 	{
-		std::string lowerUrl = a_url;
+		// Use thread_local buffer to avoid repeated allocations
+		thread_local std::string lowerUrl;
+		lowerUrl.assign(a_url);
 		std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
 
 		// Exclude Compass Navigation Overhaul compass for harmless settings conflict.
@@ -45,9 +47,9 @@ namespace Utils
 	// String & Path Helpers
 	// ==========================================
 
-	std::string SanitizeName(const std::string& a_name)
+	std::string SanitizeName(std::string_view a_name)
 	{
-		std::string clean = a_name;
+		std::string clean(a_name);
 		for (char& c : clean) {
 			if (!isalnum(static_cast<unsigned char>(c))) {
 				c = '_';
@@ -56,7 +58,7 @@ namespace Utils
 		return clean;
 	}
 
-	std::string UrlDecode(const std::string& a_src)
+	std::string UrlDecode(std::string_view a_src)
 	{
 		std::string ret;
 		ret.reserve(a_src.length());
@@ -65,7 +67,9 @@ namespace Utils
 		for (size_t i = 0; i < a_src.length(); i++) {
 			if (a_src[i] == '%') {
 				if (i + 2 < a_src.length()) {
-					if (sscanf_s(a_src.substr(i + 1, 2).c_str(), "%x", &ii) != EOF) {
+					// Need a temporary string for sscanf if using string_view source
+					char hex[3] = { a_src[i + 1], a_src[i + 2], '\0' };
+					if (sscanf_s(hex, "%x", &ii) != EOF) {
 						ret += static_cast<char>(ii);
 						i = i + 2;
 						continue;
@@ -77,39 +81,48 @@ namespace Utils
 		return ret;
 	}
 
-	std::string ExtractFilename(std::string a_path)
+	std::string ExtractFilename(std::string_view a_path)
 	{
 		if (a_path.empty()) {
 			return "";
 		}
 
-		std::replace(a_path.begin(), a_path.end(), '\\', '/');
+		// Work with view first to identify bounds
+		std::string_view p = a_path;
 
-		size_t lastSlash = a_path.rfind('/');
-		if (lastSlash != std::string::npos) {
-			a_path = a_path.substr(lastSlash + 1);
+		// 1. Handle directory separators
+		// find_last_of handles both / and \ so manual replacement is not needed
+		size_t lastSlash = p.find_last_of("/\\");
+		if (lastSlash != std::string_view::npos) {
+			p = p.substr(lastSlash + 1);
 		}
 
-		size_t lastDot = a_path.rfind('.');
-		if (lastDot != std::string::npos) {
-			a_path = a_path.substr(0, lastDot);
+		// 2. Handle extensions
+		size_t lastDot = p.rfind('.');
+		if (lastDot != std::string_view::npos) {
+			p = p.substr(0, lastDot);
 		}
 
-		if (!a_path.empty()) {
-			// Only fix purely lowercase strings.
-			bool hasUpper = std::any_of(a_path.begin(), a_path.end(), [](unsigned char c) {
-				return std::isupper(c);
-			});
-
-			if (!hasUpper) {
-				a_path[0] = static_cast<char>(toupper(static_cast<unsigned char>(a_path[0])));
-			}
+		if (p.empty()) {
+			return "";
 		}
 
-		return a_path;
+		// 3. Construct result and fix case
+		std::string result(p);
+
+		// Only fix purely lowercase strings.
+		bool hasUpper = std::any_of(result.begin(), result.end(), [](unsigned char c) {
+			return std::isupper(c);
+		});
+
+		if (!hasUpper) {
+			result[0] = static_cast<char>(toupper(static_cast<unsigned char>(result[0])));
+		}
+
+		return result;
 	}
 
-	std::string GetWidgetDisplayName(const std::string& a_source)
+	std::string GetWidgetDisplayName(std::string_view a_source)
 	{
 		// Extract the clean name from the Source URL (e.g., "meter.swf" -> "Meter").
 		// We rely on the fact that ScanArrayContainer and GetMenuURL ensure a_source is never empty.
@@ -121,10 +134,10 @@ namespace Utils
 	// Menu & URL Logic
 	// ==========================================
 
-	bool IsSystemMenu(const std::string& a_menuName)
+	bool IsSystemMenu(std::string_view a_menuName)
 	{
 		// Fader Menu excluded to preserve vanilla fade timing
-		static const std::unordered_set<std::string> systemMenus = {
+		static const std::unordered_set<std::string_view> systemMenus = {
 			"BarterMenu", "Book Menu", "Console", "Console Native UI Menu",
 			"ContainerMenu", "Crafting Menu", "Credits Menu",
 			"Cursor Menu", "Dialogue Menu", "FavoritesMenu", "GiftMenu",
@@ -196,58 +209,44 @@ namespace Utils
 		using Flag = RE::UI_MENU_FLAGS;
 		auto flags = a_menu->menuFlags;
 
-		std::vector<std::string> activeFlags;
+		std::ostringstream oss;
+		bool first = true;
+
+		auto checkFlag = [&](Flag f, const char* name) {
+			if (flags.all(f)) {
+				if (!first)
+					oss << " | ";
+				oss << name;
+				first = false;
+			}
+		};
 
 		// Primary heuristic flags (The ones we ignore)
-		if (flags.all(Flag::kPausesGame))
-			activeFlags.push_back("PausesGame");
-		if (flags.all(Flag::kUsesCursor))
-			activeFlags.push_back("UsesCursor");
-		if (flags.all(Flag::kUsesMenuContext))
-			activeFlags.push_back("UsesMenuContext");
+		checkFlag(Flag::kPausesGame, "PausesGame");
+		checkFlag(Flag::kUsesCursor, "UsesCursor");
+		checkFlag(Flag::kUsesMenuContext, "UsesMenuContext");
 
 		// Secondary flags (Informational)
-		if (flags.all(Flag::kAllowSaving))
-			activeFlags.push_back("AllowSaving");
-		if (flags.all(Flag::kAlwaysOpen))
-			activeFlags.push_back("AlwaysOpen");
-		if (flags.all(Flag::kApplicationMenu))
-			activeFlags.push_back("ApplicationMenu");
-		if (flags.all(Flag::kAssignCursorToRenderer))
-			activeFlags.push_back("AssignCursorToRenderer");
-		if (flags.all(Flag::kCustomRendering))
-			activeFlags.push_back("CustomRendering");
-		if (flags.all(Flag::kDisablePauseMenu))
-			activeFlags.push_back("DisablePauseMenu");
-		if (flags.all(Flag::kHasButtonBar))
-			activeFlags.push_back("HasButtonBar");
-		if (flags.all(Flag::kInventoryItemMenu))
-			activeFlags.push_back("InventoryItemMenu");
-		if (flags.all(Flag::kModal))
-			activeFlags.push_back("Modal");
-		if (flags.all(Flag::kRendersOffscreenTargets))
-			activeFlags.push_back("RendersOffscreen");
-		if (flags.all(Flag::kRendersUnderPauseMenu))
-			activeFlags.push_back("RendersUnderPauseMenu");
-		if (flags.all(Flag::kTopmostRenderedMenu))
-			activeFlags.push_back("Topmost");
-		if (flags.all(Flag::kUsesMovementToDirection))
-			activeFlags.push_back("UsesMovementToDirection");
+		checkFlag(Flag::kAllowSaving, "AllowSaving");
+		checkFlag(Flag::kAlwaysOpen, "AlwaysOpen");
+		checkFlag(Flag::kApplicationMenu, "ApplicationMenu");
+		checkFlag(Flag::kAssignCursorToRenderer, "AssignCursorToRenderer");
+		checkFlag(Flag::kCustomRendering, "CustomRendering");
+		checkFlag(Flag::kDisablePauseMenu, "DisablePauseMenu");
+		checkFlag(Flag::kHasButtonBar, "HasButtonBar");
+		checkFlag(Flag::kInventoryItemMenu, "InventoryItemMenu");
+		checkFlag(Flag::kModal, "Modal");
+		checkFlag(Flag::kRendersOffscreenTargets, "RendersOffscreen");
+		checkFlag(Flag::kRendersUnderPauseMenu, "RendersUnderPauseMenu");
+		checkFlag(Flag::kTopmostRenderedMenu, "Topmost");
+		checkFlag(Flag::kUsesMovementToDirection, "UsesMovementToDirection");
 
-		if (activeFlags.empty()) {
+		if (first)
 			return "None";
-		}
-
-		std::string flagStr;
-		for (size_t i = 0; i < activeFlags.size(); ++i) {
-			flagStr += activeFlags[i];
-			if (i < activeFlags.size() - 1)
-				flagStr += " | ";
-		}
-		return flagStr;
+		return oss.str();
 	}
 
-	void LogMenuFlags(const std::string& a_name, RE::IMenu* a_menu)
+	void LogMenuFlags(std::string_view a_name, RE::IMenu* a_menu)
 	{
 		// Added check for debug setting
 		if (!Settings::GetSingleton()->IsMenuFlagLoggingEnabled()) {
@@ -259,10 +258,12 @@ namespace Utils
 
 		// Guard: Only log each menu once per session to prevent spam
 		static std::unordered_set<std::string> _loggedMenus;
-		if (_loggedMenus.contains(a_name)) {
+		std::string nameStr(a_name);
+
+		if (_loggedMenus.contains(nameStr)) {
 			return;
 		}
-		_loggedMenus.insert(a_name);
+		_loggedMenus.insert(nameStr);
 
 		std::string flagStr = GetMenuFlags(a_menu);
 
@@ -344,26 +345,16 @@ namespace Utils
 			std::string sourceInfo;
 			RE::GFxValue urlVal;
 
-			// We need mutable access to call GetMember
-			auto& obj = const_cast<RE::GFxValue&>(a_val);
-
-			if (obj.GetMember("_url", &urlVal) && urlVal.IsString()) {
+			if (const_cast<RE::GFxValue&>(a_val).GetMember("_url", &urlVal) && urlVal.IsString()) {
 				sourceInfo = "[Source: " + std::string(urlVal.GetString()) + "] ";
 			}
 
-			// Get Alpha
-			RE::GFxValue alphaVal;
-			double alpha = 0.0;
-			if (obj.GetMember("_alpha", &alphaVal) && alphaVal.IsNumber()) {
-				alpha = alphaVal.GetNumber();
-			}
+			// Get Alpha & Visible
+			RE::GFxValue::DisplayInfo dInfo;
+			const_cast<RE::GFxValue&>(a_val).GetDisplayInfo(&dInfo);
 
-			// Get Visible
-			RE::GFxValue visVal;
-			std::string visStr = "?";
-			if (obj.GetMember("_visible", &visVal) && visVal.IsBool()) {
-				visStr = visVal.GetBool() ? "TRUE" : "FALSE";
-			}
+			double alpha = dInfo.GetAlpha();
+			std::string visStr = dInfo.GetVisible() ? "TRUE" : "FALSE";
 
 			// Log format: [Source] [DisplayObject] [A=000.0] [V=TRUE] Path
 			logger::info("{}[DisplayObject] [A={:05.1f}] [V={}] {}.{}", sourceInfo, alpha, visStr, _prefix, name);
@@ -372,7 +363,9 @@ namespace Utils
 		// Recurse into DisplayObjects and Arrays only (not generic Objects)
 		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
 			DebugVisitor subVisitor(_prefix + "." + name, _depth - 1);
-			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
+			a_val.VisitMembers([&subVisitor](const char* name, const RE::GFxValue& val) {
+				subVisitor.Visit(name, val);
+			});
 		}
 	}
 
@@ -444,7 +437,9 @@ namespace Utils
 		// Recurse into DisplayObjects and Arrays only (not generic Objects)
 		if (_depth > 0 && (a_val.IsDisplayObject() || a_val.IsArray())) {
 			ContainerDiscoveryVisitor subVisitor(_count, _changes, currentPath, _depth - 1);
-			const_cast<RE::GFxValue&>(a_val).VisitMembers(&subVisitor);
+			a_val.VisitMembers([&subVisitor](const char* name, const RE::GFxValue& val) {
+				subVisitor.Visit(name, val);
+			});
 		}
 	}
 }

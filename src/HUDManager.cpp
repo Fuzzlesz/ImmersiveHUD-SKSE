@@ -8,13 +8,13 @@
 
 // ==========================================
 	// Utility Classes
-// ==========================================
+	// ==========================================
 
-namespace
+	namespace
 {
 	// Aggressively forces any DisplayObject found to be visible and at 100 alpha (or max opacity).
 	// Used to fix vanilla enchantment charge meter visibility issues, required for unlabeled children.
-	class VisibilityHammer : public RE::GFxValue::ObjectVisitor
+	class VisibilityHammer
 	{
 	public:
 		VisibilityHammer(bool a_forceVisible = false, int a_depth = 1) :
@@ -22,17 +22,23 @@ namespace
 			_depth(a_depth)
 		{}
 
-		void Visit(const char* a_name, const RE::GFxValue& a_val) override
+		void Visit(const char* a_name, const RE::GFxValue& a_val)
 		{
-			if (a_val.IsDisplayObject()) {
-				if (_forceVisible) {
-					std::string lowerName = a_name ? a_name : "unnamed";
-					std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+			if (!a_val.IsDisplayObject()) {
+				return;
+			}
 
-					RE::GFxValue::DisplayInfo d;
-					auto& obj = const_cast<RE::GFxValue&>(a_val);
-					obj.GetDisplayInfo(&d);
+			if (_forceVisible) {
+				// Optimization: Precompute lower name in thread_local buffer
+				thread_local std::string lowerName;
+				lowerName.assign(a_name ? a_name : "unnamed");
+				std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 
+				RE::GFxValue::DisplayInfo d;
+				// We need mutable access to call GetDisplayInfo
+				auto& obj = const_cast<RE::GFxValue&>(a_val);
+
+				if (obj.GetDisplayInfo(&d)) {
 					bool changed = false;
 					if (!d.GetVisible()) {
 						d.SetVisible(true);
@@ -40,24 +46,28 @@ namespace
 					}
 
 					// Protect penalty bars: low-health/survival blinking uses these names.
-					bool isAnimated = (lowerName.find("flash") != std::string::npos ||
-									   lowerName.find("blink") != std::string::npos ||
-									   lowerName.find("penalty") != std::string::npos);
-
-					// Force 100 alpha to skip vanilla fade-ins while ScaleX handles draining.
-					if (!isAnimated && d.GetAlpha() < 100.0) {
-						d.SetAlpha(100.0);
-						changed = true;
+					if (lowerName.find("flash") != std::string::npos ||
+						lowerName.find("blink") != std::string::npos ||
+						lowerName.find("penalty") != std::string::npos) {
+						// Is Animated, skip alpha force
+					} else {
+						// Force 100 alpha to skip vanilla fade-ins while ScaleX handles draining.
+						if (d.GetAlpha() < 100.0) {
+							d.SetAlpha(100.0);
+							changed = true;
+						}
 					}
+
 					if (changed) {
 						obj.SetDisplayInfo(d);
 					}
+				}
 
-					// Recurse to handle nested clips (e.g. ChargeMeter_mc).
-					if (_depth > 0) {
-						VisibilityHammer subHammer(_forceVisible, _depth - 1);
-						obj.VisitMembers(&subHammer);
-					}
+				// Recurse to handle nested clips (e.g. ChargeMeter_mc).
+				if (_depth > 0) {
+					obj.VisitMembers([this](const char* name, const RE::GFxValue& val) {
+						this->Visit(name, val);
+					});
 				}
 			}
 		}
@@ -280,9 +290,13 @@ void HUDManager::Update(float a_delta)
 	if (!_installed) {
 		return;
 	}
+
 	const auto player = RE::PlayerCharacter::GetSingleton();
 	const auto compat = Compat::GetSingleton();
-	if (!player) {
+	const auto ui = RE::UI::GetSingleton();
+	const auto settings = Settings::GetSingleton();
+
+	if (!player || !ui) {
 		return;
 	}
 
@@ -294,8 +308,6 @@ void HUDManager::Update(float a_delta)
 		}
 		return;
 	}
-
-	const auto settings = Settings::GetSingleton();
 
 	// Timed display logic: decrement timer and toggle visibility off when expired
 	if (_displayTimer > 0.0f && !settings->IsHoldMode()) {
@@ -321,8 +333,7 @@ void HUDManager::Update(float a_delta)
 	}
 
 	if (!_hasScanned) {
-		auto* ui = RE::UI::GetSingleton();
-		if (ui && ui->GetMenu("HUD Menu")) {
+		if (ui->GetMenu("HUD Menu")) {
 			ScanIfReady();
 		} else {
 			return;
@@ -356,13 +367,16 @@ void HUDManager::Update(float a_delta)
 	}
 	_targetAlpha = shouldBeVisible ? hudMax : hudMin;
 
+	// Per-element state targets helper
+	auto getTarget = [&](bool active) { return active ? hudMax : hudMin; };
+
 	// Per-element state targets for fancy linear fading
-	float targetInterior = isInterior ? hudMax : hudMin;
-	float targetExterior = !isInterior ? hudMax : hudMin;
-	float targetCombat = isInCombat ? hudMax : hudMin;
-	float targetNotInCombat = !isInCombat ? hudMax : hudMin;
-	float targetWeapon = isWeaponDrawn ? hudMax : hudMin;
-	float targetLockedOn = isLockedOn ? hudMax : hudMin;
+	float targetInterior = getTarget(isInterior);
+	float targetExterior = getTarget(!isInterior);
+	float targetCombat = getTarget(isInCombat);
+	float targetNotInCombat = getTarget(!isInCombat);
+	float targetWeapon = getTarget(isWeaponDrawn);
+	float targetLockedOn = getTarget(isLockedOn);
 
 	// Calculate Contextual States
 	// Action: Aiming a Bow, Casting an Aimed Spell.
@@ -605,7 +619,9 @@ void HUDManager::EnforceHMSMeterVisible(RE::GFxValue& a_parent, bool a_forcePerm
 {
 	if (a_parent.IsObject()) {
 		VisibilityHammer hammer(a_forcePermanent, 0);
-		a_parent.VisitMembers(&hammer);
+		a_parent.VisitMembers([&](const char* name, const RE::GFxValue& val) {
+			hammer.Visit(name, val);
+		});
 	}
 }
 
@@ -614,7 +630,9 @@ void HUDManager::EnforceEnchantMeterVisible(RE::GFxValue& a_parent)
 {
 	if (a_parent.IsObject()) {
 		VisibilityHammer hammer(true, 1);
-		a_parent.VisitMembers(&hammer);
+		a_parent.VisitMembers([&](const char* name, const RE::GFxValue& val) {
+			hammer.Visit(name, val);
+		});
 	}
 }
 
@@ -653,10 +671,11 @@ void HUDManager::ApplySkyHUDSubMeter(RE::GFxValue& a_parent, const char* a_membe
 	RE::GFxValue sub;
 	if (a_parent.GetMember(a_memberName, &sub)) {
 		RE::GFxValue::DisplayInfo s;
-		sub.GetDisplayInfo(&s);
-		s.SetVisible(a_shouldBeVisible);
-		s.SetAlpha(a_shouldBeVisible ? 100.0 : 0.0);
-		sub.SetDisplayInfo(s);
+		if (sub.GetDisplayInfo(&s)) {
+			s.SetVisible(a_shouldBeVisible);
+			s.SetAlpha(a_shouldBeVisible ? 100.0 : 0.0);
+			sub.SetDisplayInfo(s);
+		}
 		if (a_shouldBeVisible && a_callHammer) {
 			EnforceEnchantMeterVisible(sub);
 		}
@@ -722,7 +741,9 @@ void HUDManager::ScanForContainers(RE::GFxMovieView* a_movie, int& a_foundCount,
 	}
 
 	Utils::ContainerDiscoveryVisitor visitor(a_foundCount, a_changes, "_root");
-	root.VisitMembers(&visitor);
+	root.VisitMembers([&](const char* name, const RE::GFxValue& val) {
+		visitor.Visit(name, val);
+	});
 }
 
 void HUDManager::ScanForWidgets(bool a_forceUpdate, bool a_deepScan, bool a_isRuntime)
@@ -868,7 +889,9 @@ void HUDManager::DumpHUDStructure()
 			logger::info("=== DUMPING HUD ROOT ===");
 			// Change depth value here to explore deeper levels of the HUD structure.
 			Utils::DebugVisitor visitor("_root", 3);
-			root.VisitMembers(&visitor);
+			root.VisitMembers([&](const char* name, const RE::GFxValue& val) {
+				visitor.Visit(name, val);
+			});
 		}
 	}
 }
@@ -880,27 +903,27 @@ void HUDManager::DumpHUDStructure()
 void HUDManager::EnforceIgnoredVisibility(RE::GFxValue& a_target)
 {
 	RE::GFxValue::DisplayInfo dInfo;
-	a_target.GetDisplayInfo(&dInfo);
+	if (a_target.GetDisplayInfo(&dInfo)) {
+		bool changed = false;
 
-	bool changed = false;
+		// 1. Ensure the element is flagged as Visible
+		if (!dInfo.GetVisible()) {
+			dInfo.SetVisible(true);
+			changed = true;
+		}
 
-	// 1. Ensure the element is flagged as Visible
-	if (!dInfo.GetVisible()) {
-		dInfo.SetVisible(true);
-		changed = true;
-	}
+		// 2. Alpha Correction
+		// If a widget is effectively invisible (Alpha ~0) despite being flagged "Visible",
+		// force it to 100. We use a low threshold to avoid overriding intended
+		// partial transparency (e.g., a widget that is naturally 50% opacity).
+		if (dInfo.GetAlpha() < 1.0) {
+			dInfo.SetAlpha(100.0);
+			changed = true;
+		}
 
-	// 2. Alpha Correction
-	// If a widget is effectively invisible (Alpha ~0) despite being flagged "Visible",
-	// force it to 100. We use a low threshold to avoid overriding intended
-	// partial transparency (e.g., a widget that is naturally 50% opacity).
-	if (dInfo.GetAlpha() < 1.0) {
-		dInfo.SetAlpha(100.0);
-		changed = true;
-	}
-
-	if (changed) {
-		a_target.SetDisplayInfo(dInfo);
+		if (changed) {
+			a_target.SetDisplayInfo(dInfo);
+		}
 	}
 }
 
@@ -913,8 +936,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const auto settings = Settings::GetSingleton();
 	const auto compat = Compat::GetSingleton();
 	const auto player = RE::PlayerCharacter::GetSingleton();
-	const bool menuOpen = ShouldHideHUD();
 	const auto ui = RE::UI::GetSingleton();
+
+	const bool menuOpen = ShouldHideHUD();
 	const bool isConsoleOpen = ui && ui->IsMenuOpen(RE::Console::MENU_NAME);
 
 	const float hudMax = settings->GetHUDOpacityMax();
@@ -954,18 +978,20 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isResourceBar = isHealth || isMagicka || isStamina;
 		bool isCrosshair = def.isCrosshair;
 
-		for (const auto& path : def.paths) {
-			processedPaths.insert(path);
+		for (std::string_view path : def.paths) {
+			processedPaths.insert(std::string(path));
 
-			int mode = settings->GetWidgetMode(path);
+			int mode = settings->GetWidgetMode(std::string(path));
 			RE::GFxValue elem;
-			if (!a_movie->GetVariable(&elem, path) || !elem.IsDisplayObject()) {
+			if (!a_movie->GetVariable(&elem, path.data()) || !elem.IsDisplayObject()) {
 				continue;
 			}
 
 			// We need display info to determine if we should even attempt Z-Order fixing
 			RE::GFxValue::DisplayInfo dInfo;
-			elem.GetDisplayInfo(&dInfo);
+			if (!elem.GetDisplayInfo(&dInfo)) {
+				continue;
+			}
 
 			// Shout Meter Z-Order Fix for Infinity UI/Compass Navigation Overhaul
 			// We ensure the visible shout meter stays on top of the compass.
@@ -973,11 +999,9 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// We only fix elements that are currently VISIBLE, otherwise we might
 			// swap a hidden vanilla meter with the compass and mess up the hierarchy.
 			if (isShoutMeter && dInfo.GetVisible()) {
-				if (_timer > _lastShoutMeterFixTime + 2.0f || (_timer - _lastShoutMeterFixTime) < 0.1f) {
+				if (_timer - _lastShoutMeterFixTime > 2.0f) {
 					// Only update the timer on the very first element we process in this frame
-					if (_timer > _lastShoutMeterFixTime + 2.0f) {
-						_lastShoutMeterFixTime = _timer;
-					}
+					_lastShoutMeterFixTime = _timer;
 
 					RE::GFxValue parent;
 					RE::GFxValue compass;
@@ -1025,10 +1049,13 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 				// Apply Pulse logic (Ensures vanilla mode still breathes when detected)
 				if (settings->GetSneakMeterSettings().enabled && isSneaking && _lastDetectionLevel > 0.1f && finalAlpha > 0.01f) {
+					// Hardcoded constants for sin/pi
 					constexpr float kPulseRange = 0.05f;
 					constexpr float kPulseFreq = 0.05f;
+					constexpr float kTwoPi = 6.2831853f;
+
 					auto detectionFreq = (_lastDetectionLevel / 200.0f) + 0.5f;
-					auto pulse = (kPulseRange * std::sin(2.0f * (std::numbers::pi_v<float> * 2.0f) * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
+					auto pulse = (kPulseRange * std::sin(kTwoPi * detectionFreq * kPulseFreq * 0.25f * _timer)) + (1.0f - kPulseRange);
 					finalAlpha *= std::min(static_cast<float>(pulse), 1.0f);
 				}
 
@@ -1045,9 +1072,11 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 					RE::GFxValue sub;
 					if (elem.GetMember(p, &sub) && sub.IsDisplayObject()) {
 						RE::GFxValue::DisplayInfo sd;
-						sd.SetVisible(sneakVisible);
-						sd.SetAlpha(targetSneakAlpha);
-						sub.SetDisplayInfo(sd);
+						if (sub.GetDisplayInfo(&sd)) {
+							sd.SetVisible(sneakVisible);
+							sd.SetAlpha(targetSneakAlpha);
+							sub.SetDisplayInfo(sd);
+						}
 					}
 				}
 				continue;
@@ -1152,10 +1181,12 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				} else if (isTemperature) {
 					// Ensure the Temperature Meter CONTAINER stays visible even if the game wants to hide it.
 					// We verify current state first to avoid flickering caused by snapping Alpha.
-					elem.GetDisplayInfo(&dInfo);
-					if (!dInfo.GetVisible()) {
-						dInfo.SetVisible(true);
-						elem.SetDisplayInfo(dInfo);
+					RE::GFxValue::DisplayInfo tempInfo;
+					if (elem.GetDisplayInfo(&tempInfo)) {
+						if (!tempInfo.GetVisible()) {
+							tempInfo.SetVisible(true);
+							elem.SetDisplayInfo(tempInfo);
+						}
 					}
 				} else if (isEnchantSkyHUD) {
 					ApplySkyHUDEnchantment(elem, 0.0f, 0.0f, static_cast<float>(targetAlpha), mode, false);
@@ -1219,37 +1250,37 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
-		elem.GetDisplayInfo(&dInfo);
-
-		if (mode == Settings::kHidden) {
-			dInfo.SetVisible(false);
-			dInfo.SetAlpha(0.0);
-		} else if (mode == Settings::kVisible) {
-			dInfo.SetVisible(true);
-			dInfo.SetAlpha(hudMax);
-		} else if (mode == Settings::kInterior) {
-			dInfo.SetVisible(interiorAlpha > 0.01);
-			dInfo.SetAlpha(interiorAlpha);
-		} else if (mode == Settings::kExterior) {
-			dInfo.SetVisible(exteriorAlpha > 0.01);
-			dInfo.SetAlpha(exteriorAlpha);
-		} else if (mode == Settings::kInCombat) {
-			dInfo.SetVisible(combatAlpha > 0.01);
-			dInfo.SetAlpha(combatAlpha);
-		} else if (mode == Settings::kNotInCombat) {
-			dInfo.SetVisible(notInCombatAlpha > 0.01);
-			dInfo.SetAlpha(notInCombatAlpha);
-		} else if (mode == Settings::kWeaponDrawn) {
-			dInfo.SetVisible(weaponAlpha > 0.01);
-			dInfo.SetAlpha(weaponAlpha);
-		} else if (mode == Settings::kLockedOn) {
-			dInfo.SetVisible(lockedOnAlpha > 0.01);
-			dInfo.SetAlpha(lockedOnAlpha);
-		} else {
-			dInfo.SetVisible(managedAlpha > 0.01f);
-			dInfo.SetAlpha(managedAlpha);
+		if (elem.GetDisplayInfo(&dInfo)) {
+			if (mode == Settings::kHidden) {
+				dInfo.SetVisible(false);
+				dInfo.SetAlpha(0.0);
+			} else if (mode == Settings::kVisible) {
+				dInfo.SetVisible(true);
+				dInfo.SetAlpha(hudMax);
+			} else if (mode == Settings::kInterior) {
+				dInfo.SetVisible(interiorAlpha > 0.01);
+				dInfo.SetAlpha(interiorAlpha);
+			} else if (mode == Settings::kExterior) {
+				dInfo.SetVisible(exteriorAlpha > 0.01);
+				dInfo.SetAlpha(exteriorAlpha);
+			} else if (mode == Settings::kInCombat) {
+				dInfo.SetVisible(combatAlpha > 0.01);
+				dInfo.SetAlpha(combatAlpha);
+			} else if (mode == Settings::kNotInCombat) {
+				dInfo.SetVisible(notInCombatAlpha > 0.01);
+				dInfo.SetAlpha(notInCombatAlpha);
+			} else if (mode == Settings::kWeaponDrawn) {
+				dInfo.SetVisible(weaponAlpha > 0.01);
+				dInfo.SetAlpha(weaponAlpha);
+			} else if (mode == Settings::kLockedOn) {
+				dInfo.SetVisible(lockedOnAlpha > 0.01);
+				dInfo.SetAlpha(lockedOnAlpha);
+			} else {
+				dInfo.SetVisible(managedAlpha > 0.01f);
+				dInfo.SetAlpha(managedAlpha);
+			}
+			elem.SetDisplayInfo(dInfo);
 		}
-		elem.SetDisplayInfo(dInfo);
 	}
 }
 
