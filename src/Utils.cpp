@@ -126,13 +126,13 @@ namespace Utils
 		// Fader Menu excluded to preserve vanilla fade timing
 		static const std::unordered_set<std::string> systemMenus = {
 			"BarterMenu", "Book Menu", "Console", "Console Native UI Menu",
-			"ContainerMenu", "Crafting Menu", "Creation Club Menu", "Credits Menu",
+			"ContainerMenu", "Crafting Menu", "Credits Menu",
 			"Cursor Menu", "Dialogue Menu", "FavoritesMenu", "GiftMenu",
 			"InventoryMenu", "Journal Menu", "Kinect Menu", "LevelUp Menu",
-			"Loading Menu", "LoadWaitSpinner", "Lockpicking Menu", "MagicMenu",
-			"Main Menu", "MapMenu", "MessageBoxMenu", "Mist Menu",
-			"Mod Manager Menu", "RaceSex Menu", "SafeZoneMenu", "Sleep/Wait Menu",
-			"TitleSequence Menu", "Training Menu", "Tutorial Menu", "TweenMenu"
+			"Loading Menu", "LoadWaitSpinner", "Lockpicking Menu", "Login Menu", "MagicMenu",
+			"Main Menu", "MapMenu", "Marketplace Menu", "MessageBoxMenu", "Mist Menu",
+			"Mod Manager Menu", "PluginExplorerMenu", "RaceSex Menu", "SafeZoneMenu", "Sleep/Wait Menu",
+			"StatsMenu", "TitleSequence Menu", "Training Menu", "Tutorial Menu", "TweenMenu"
 		};
 		return systemMenus.contains(a_menuName);
 	}
