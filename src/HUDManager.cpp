@@ -10,25 +10,24 @@
 	// Utility Classes
 	// ==========================================
 
-	namespace
+namespace
 {
 	// Aggressively forces any DisplayObject found to be visible and at 100 alpha (or max opacity).
 	// Used to fix vanilla enchantment charge meter visibility issues, required for unlabeled children.
 	class VisibilityHammer
 	{
-	public:
-		VisibilityHammer(bool a_forceVisible = false, int a_depth = 1) :
-			_forceVisible(a_forceVisible),
-			_depth(a_depth)
-		{}
+		public:
+			VisibilityHammer(bool a_forceVisible = false, int a_depth = 1) :
+				_forceVisible(a_forceVisible),
+				_depth(a_depth)
+			{}
 
-		void Visit(const char* a_name, const RE::GFxValue& a_val)
-		{
-			if (!a_val.IsDisplayObject()) {
-				return;
-			}
+			void Visit(const char* a_name, const RE::GFxValue& a_val)
+			{
+				if (!a_val.IsDisplayObject() || !_forceVisible) {
+					return;
+				}
 
-			if (_forceVisible) {
 				// Optimization: Precompute lower name in thread_local buffer
 				thread_local std::string lowerName;
 				lowerName.assign(a_name ? a_name : "unnamed");
@@ -65,16 +64,17 @@
 
 				// Recurse to handle nested clips (e.g. ChargeMeter_mc).
 				if (_depth > 0) {
-					obj.VisitMembers([this](const char* name, const RE::GFxValue& val) {
-						this->Visit(name, val);
+					VisibilityHammer childHammer(_forceVisible, _depth - 1);
+
+					obj.VisitMembers([&childHammer](const char* name, const RE::GFxValue& val) {
+						childHammer.Visit(name, val);
 					});
 				}
 			}
-		}
 
-	private:
-		bool _forceVisible;
-		int _depth;
+			private:
+				bool _forceVisible;
+				int _depth;
 	};
 }
 
