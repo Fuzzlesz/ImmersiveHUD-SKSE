@@ -576,9 +576,7 @@ void HUDManager::Update(float a_delta)
 		_timer += _prevDelta;
 	}
 
-	SKSE::GetTaskInterface()->AddUITask([this, alpha = _currentAlpha]() {
-		ApplyAlphaToHUD(alpha);
-	});
+	ApplyAlphaToHUD(_currentAlpha);
 }
 
 // ==========================================
@@ -1163,11 +1161,23 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// For Compass AND Shout Meter sub-components, we MUST NOT touch the _visible property.
 			// SkyHUD hides the vanilla frame and shows the Alt frame via _visible.
 			// If we force SetVisible(true), we show both. We rely on Alpha to hide.
+			bool changed = false;
+
 			if (!isCompass && !isShoutMeter) {
-				dInfo.SetVisible(shouldBeVisible);
+				if (dInfo.GetVisible() != shouldBeVisible) {
+					dInfo.SetVisible(shouldBeVisible);
+					changed = true;
+				}
 			}
-			dInfo.SetAlpha(targetAlpha);
-			elem.SetDisplayInfo(dInfo);
+
+			if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
+				dInfo.SetAlpha(targetAlpha);
+				changed = true;
+			}
+
+			if (changed) {
+				elem.SetDisplayInfo(dInfo);
+			}
 
 			// Visibility Hammer logic: Override engine hiding
 			if (shouldBeVisible && (targetAlpha > 0.1 || _wasHidden)) {
@@ -1250,35 +1260,51 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		}
 
 		RE::GFxValue::DisplayInfo dInfo;
-		if (elem.GetDisplayInfo(&dInfo)) {
-			if (mode == Settings::kHidden) {
-				dInfo.SetVisible(false);
-				dInfo.SetAlpha(0.0);
-			} else if (mode == Settings::kVisible) {
-				dInfo.SetVisible(true);
-				dInfo.SetAlpha(hudMax);
-			} else if (mode == Settings::kInterior) {
-				dInfo.SetVisible(interiorAlpha > 0.01);
-				dInfo.SetAlpha(interiorAlpha);
-			} else if (mode == Settings::kExterior) {
-				dInfo.SetVisible(exteriorAlpha > 0.01);
-				dInfo.SetAlpha(exteriorAlpha);
-			} else if (mode == Settings::kInCombat) {
-				dInfo.SetVisible(combatAlpha > 0.01);
-				dInfo.SetAlpha(combatAlpha);
-			} else if (mode == Settings::kNotInCombat) {
-				dInfo.SetVisible(notInCombatAlpha > 0.01);
-				dInfo.SetAlpha(notInCombatAlpha);
-			} else if (mode == Settings::kWeaponDrawn) {
-				dInfo.SetVisible(weaponAlpha > 0.01);
-				dInfo.SetAlpha(weaponAlpha);
-			} else if (mode == Settings::kLockedOn) {
-				dInfo.SetVisible(lockedOnAlpha > 0.01);
-				dInfo.SetAlpha(lockedOnAlpha);
-			} else {
-				dInfo.SetVisible(managedAlpha > 0.01f);
-				dInfo.SetAlpha(managedAlpha);
-			}
+		elem.GetDisplayInfo(&dInfo);
+
+		bool shouldBeVisible = true;
+		double targetAlpha = managedAlpha;
+
+		if (mode == Settings::kHidden) {
+			shouldBeVisible = false;
+			targetAlpha = 0.0;
+		} else if (mode == Settings::kVisible) {
+			shouldBeVisible = true;
+			targetAlpha = hudMax;
+		} else if (mode == Settings::kInterior) {
+			shouldBeVisible = (interiorAlpha > 0.01);
+			targetAlpha = interiorAlpha;
+		} else if (mode == Settings::kExterior) {
+			shouldBeVisible = (exteriorAlpha > 0.01);
+			targetAlpha = exteriorAlpha;
+		} else if (mode == Settings::kInCombat) {
+			shouldBeVisible = (combatAlpha > 0.01);
+			targetAlpha = combatAlpha;
+		} else if (mode == Settings::kNotInCombat) {
+			shouldBeVisible = (notInCombatAlpha > 0.01);
+			targetAlpha = notInCombatAlpha;
+		} else if (mode == Settings::kWeaponDrawn) {
+			shouldBeVisible = (weaponAlpha > 0.01);
+			targetAlpha = weaponAlpha;
+		} else if (mode == Settings::kLockedOn) {
+			shouldBeVisible = (lockedOnAlpha > 0.01);
+			targetAlpha = lockedOnAlpha;
+		} else {
+			shouldBeVisible = (managedAlpha > 0.01f);
+			targetAlpha = managedAlpha;
+		}
+
+		bool changed = false;
+		if (dInfo.GetVisible() != shouldBeVisible) {
+			dInfo.SetVisible(shouldBeVisible);
+			changed = true;
+		}
+		if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
+			dInfo.SetAlpha(targetAlpha);
+			changed = true;
+		}
+
+		if (changed) {
 			elem.SetDisplayInfo(dInfo);
 		}
 	}
@@ -1314,8 +1340,7 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			continue;
 		}
 
-		// Skip Fader Menu to prevent interference with vanilla fade timing
-		if (menuNameStr == "Fader Menu") {
+		if (menuNameStr == "Fader Menu" || Utils::IsSystemMenu(menuNameStr) || Utils::IsInteractiveMenu(entry.menu.get())) {
 			continue;
 		}
 
@@ -1348,25 +1373,31 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		// For other modes, we set the target alpha blindly
 		RE::GFxValue::DisplayInfo dInfo;
+		root.GetDisplayInfo(&dInfo);
+
+		double targetAlpha = a_alpha;
+
 		if (mode == Settings::kVisible) {
-			dInfo.SetAlpha(hudMax);
+			targetAlpha = hudMax;
 		} else if (mode == Settings::kHidden) {
-			dInfo.SetAlpha(0.0);
+			targetAlpha = 0.0;
 		} else if (mode == Settings::kInterior) {
-			dInfo.SetAlpha(interiorAlpha);
+			targetAlpha = interiorAlpha;
 		} else if (mode == Settings::kExterior) {
-			dInfo.SetAlpha(exteriorAlpha);
+			targetAlpha = exteriorAlpha;
 		} else if (mode == Settings::kInCombat) {
-			dInfo.SetAlpha(combatAlpha);
+			targetAlpha = combatAlpha;
 		} else if (mode == Settings::kNotInCombat) {
-			dInfo.SetAlpha(notInCombatAlpha);
+			targetAlpha = notInCombatAlpha;
 		} else if (mode == Settings::kWeaponDrawn) {
-			dInfo.SetAlpha(weaponAlpha);
+			targetAlpha = weaponAlpha;
 		} else if (mode == Settings::kLockedOn) {
-			dInfo.SetAlpha(lockedOnAlpha);
-		} else {
-			dInfo.SetAlpha(a_alpha);
+			targetAlpha = lockedOnAlpha;
 		}
-		root.SetDisplayInfo(dInfo);
+
+		if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
+			dInfo.SetAlpha(targetAlpha);
+			root.SetDisplayInfo(dInfo);
+		}
 	}
 }
