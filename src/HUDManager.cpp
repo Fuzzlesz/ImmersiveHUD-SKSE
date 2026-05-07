@@ -1344,10 +1344,6 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 			continue;
 		}
 
-		if (Utils::IsSystemMenu(menuNameStr)) {
-			continue;
-		}
-
 		if (Utils::IsInteractiveMenu(entry.menu.get())) {
 			continue;
 		}
