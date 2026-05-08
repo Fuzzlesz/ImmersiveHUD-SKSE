@@ -163,6 +163,15 @@ void Settings::SetDumpHUDEnabled(bool a_enabled)
 
 bool Settings::AddDiscoveredPath(const std::string& a_path, const std::string& a_source)
 {
+	// Sanity check: Prevent cache corruption from garbage Scaleform names / binary memory.
+	// Valid paths (Scaleform instances and UI menu names) should be strictly standard printable ASCII.
+	for (char c : a_path) {
+		auto uc = static_cast<unsigned char>(c);
+		if (uc < 32 || uc > 126) {
+			return false;  // Reject corrupt/binary paths immediately
+		}
+	}
+
 	bool changed = false;
 
 	// 1. Add path if new

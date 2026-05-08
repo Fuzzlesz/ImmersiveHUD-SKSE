@@ -387,8 +387,8 @@ namespace Utils
 		}
 		std::string name(a_name);
 
-		// Use the general blocklist
-		if (kDiscoveryBlockList.contains(name)) {
+		// Use the general blocklist and ignore auto-generated flash instances
+		if (kDiscoveryBlockList.contains(name) || name.starts_with("instance")) {
 			return;
 		}
 

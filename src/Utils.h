@@ -1,6 +1,6 @@
 #pragma once
 
-	namespace Utils
+namespace Utils
 {
 	// Checks if a swf file is on the blocklist
 	bool IsIgnoredUrl(std::string_view a_url);
