@@ -1,10 +1,10 @@
 #include "Compat.h"
 
-	// ==========================================
-	// Compatibility Implementation
-	// ==========================================
+// ==========================================
+// Compatibility Implementation
+// ==========================================
 
-	void Compat::InitExternalData()
+void Compat::InitExternalData()
 {
 	auto dataHandler = RE::TESDataHandler::GetSingleton();
 	if (!dataHandler) {
@@ -217,6 +217,11 @@ bool Compat::CameraStateCheck()
 
 	// Auto Vanity / Vanity Cam
 	if (camera->currentState == camera->cameraStates[RE::CameraState::kAutoVanity]) {
+		return true;
+	}
+
+	// Bleedout Cam (e.g. knocked down/dying)
+	if (camera->currentState == camera->cameraStates[RE::CameraState::kBleedout]) {
 		return true;
 	}
 
