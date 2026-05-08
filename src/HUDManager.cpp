@@ -953,10 +953,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 	const float lockedOnAlpha = menuOpen ? 0.0f : _lockedOnAlpha;
 
 	// Immediate state checks for Visibility Hammer logic
-	const bool isInterior = player && player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
-	const bool isInCombat = player && player->IsInCombat();
-	const bool isWeaponDrawn = compat->IsPlayerWeaponDrawn();
-	const bool isLockedOn = compat->IsTDMActive();
 	const bool isSneaking = player && player->IsSneaking();
 
 	// Local set to track paths processed in this frame and prevent growth leaks
@@ -1126,22 +1122,22 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 				targetAlpha = 0.0;
 			} else if (mode == Settings::kInterior) {
 				targetAlpha = interiorAlpha;
-				shouldBeVisible = isInterior && !menuOpen;
+				shouldBeVisible = (interiorAlpha > 0.01) && !menuOpen;
 			} else if (mode == Settings::kExterior) {
 				targetAlpha = exteriorAlpha;
-				shouldBeVisible = !isInterior && !menuOpen;
+				shouldBeVisible = (exteriorAlpha > 0.01) && !menuOpen;
 			} else if (mode == Settings::kInCombat) {
 				targetAlpha = combatAlpha;
-				shouldBeVisible = isInCombat && !menuOpen;
+				shouldBeVisible = (combatAlpha > 0.01) && !menuOpen;
 			} else if (mode == Settings::kNotInCombat) {
 				targetAlpha = notInCombatAlpha;
-				shouldBeVisible = !isInCombat && !menuOpen;
+				shouldBeVisible = (notInCombatAlpha > 0.01) && !menuOpen;
 			} else if (mode == Settings::kWeaponDrawn) {
 				targetAlpha = weaponAlpha;
-				shouldBeVisible = isWeaponDrawn && !menuOpen;
+				shouldBeVisible = (weaponAlpha > 0.01) && !menuOpen;
 			} else if (mode == Settings::kLockedOn) {
 				targetAlpha = lockedOnAlpha;
-				shouldBeVisible = isLockedOn && !menuOpen;
+				shouldBeVisible = (lockedOnAlpha > 0.01) && !menuOpen;
 			} else if (isEnchantElement) {
 				targetAlpha = CalculateEnchantmentTargetAlpha(isEnchantLeft, isEnchantSkyHUD, mode, alphaL, alphaR, managedAlpha);
 				shouldBeVisible = (targetAlpha > 0.01);
