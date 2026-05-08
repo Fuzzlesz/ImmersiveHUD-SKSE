@@ -32,6 +32,12 @@ void Compat::InitExternalData()
 		logger::info("Linked generic HUD control globals from ImmersiveHUD.esp");
 	}
 
+	// Disable for Inpa Sekiro Combat because their stamina meter mofications conflict and crash
+	if (dataHandler->LookupModByName("Inpa Sekiro Combat.esp")) {
+		_inpaSekiroCombatLoaded = true;
+		logger::info("Inpa Sekiro Combat detected. Relinquishing Stamina control.");
+	}
+
 	// SkyHUD alt charge detection
 	const fs::path skyhudPath = "Data/Interface/skyhud/skyhud.txt";
 	if (fs::exists(skyhudPath)) {
@@ -48,6 +54,11 @@ void Compat::InitExternalData()
 			}
 		}
 	}
+}
+
+bool Compat::IsInpaSekiroCombatLoaded() const
+{
+	return _inpaSekiroCombatLoaded;
 }
 
 bool Compat::IsSkyHUDAltChargeEnabled() const

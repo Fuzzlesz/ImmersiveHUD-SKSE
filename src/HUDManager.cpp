@@ -971,6 +971,11 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 		bool isStamina = (strcmp(def.id, "iMode_Stamina") == 0);
 		bool isTemperature = (strcmp(def.id, "iMode_Temperature") == 0);
 
+		// INPA SEKIRO FIX: Completely skip stamina handling if Inpa is managing it
+		if (isStamina && compat->IsInpaSekiroCombatLoaded()) {
+			continue;
+		}
+
 		bool isEnchantLeft, isEnchantRight, isEnchantSkyHUD;
 		bool isEnchantElement = IsEnchantmentElement(def.id, isEnchantLeft, isEnchantRight, isEnchantSkyHUD);
 		bool isResourceBar = isHealth || isMagicka || isStamina;

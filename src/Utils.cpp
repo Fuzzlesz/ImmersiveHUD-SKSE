@@ -1,3 +1,4 @@
+#include "Compat.h"
 #include "HUDManager.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -429,6 +430,13 @@ namespace Utils
 
 				// If we are here, it is a Vanilla object.
 				if (name != "HUDMovieBaseInstance") {
+					return;
+				}
+
+				// INPA SEKIRO FIX: Inpa Sekiro Combat heavily modifies HUDMovieBaseInstance.
+				// Calling VisitMembers on it causes a crash. We skip deep scanning it.
+				// Direct path access (GetVariable) for hardcoded elements still works fine.
+				if (Compat::GetSingleton()->IsInpaSekiroCombatLoaded()) {
 					return;
 				}
 			}

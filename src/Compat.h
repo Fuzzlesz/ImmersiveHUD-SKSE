@@ -38,6 +38,7 @@ public:
 	bool IsSpellContextual(RE::MagicItem* a_magicItem);
 
 	bool IsSkyHUDAltChargeEnabled() const;
+	bool IsInpaSekiroCombatLoaded() const;
 
 	// API Handles
 	SmoothCamAPI::IVSmoothCam3* g_SmoothCam = nullptr;
@@ -55,4 +56,5 @@ private:
 	bool _hasSmoothCamCrosshairControl = false;
 	bool _hasSmoothCamStealthControl = false;
 	bool _skyHUDAltCharge = false;
+	bool _inpaSekiroCombatLoaded = false;
 };
