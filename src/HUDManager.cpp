@@ -306,6 +306,11 @@ void HUDManager::Update(float a_delta)
 		if (compat->g_SmoothCam) {
 			compat->ManageSmoothCamControl(false);
 		}
+
+		if (!_wasHidden) {
+			_wasHidden = true;
+			SKSE::GetTaskInterface()->AddUITask([this]() { ApplyAlphaToHUD(0.0f); });
+		}
 		return;
 	}
 
@@ -590,12 +595,17 @@ bool HUDManager::ShouldHideHUD()
 		return false;
 	}
 
-	// 1. Camera State Check (VATS, FreeCam, Auto-Vanity)
+	// 1. Check if we're disabled by global
+	if (Compat::GetSingleton()->IsImmersiveHUDDisabled()) {
+		return true;
+	}
+
+	// 2. Camera State Check (VATS, FreeCam, Auto-Vanity)
 	if (Compat::GetSingleton()->CameraStateCheck()) {
 		return true;
 	}
 
-	// 2. System UI Checks
+	// 3. System UI Checks
 	if (ui->IsApplicationMenuOpen() || ui->IsItemMenuOpen()) {
 		return true;
 	}
