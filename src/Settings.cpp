@@ -64,6 +64,7 @@ void Settings::Load()
 
 		_crosshair.enabled = ini.GetBoolValue("Crosshair", "bEnabled", true);
 		_crosshair.hideWhileAiming = ini.GetBoolValue("Crosshair", "bHideWhileAiming", false);
+		_crosshair.hideWhileSneaking = ini.GetBoolValue("Crosshair", "bHideWhileSneaking", false);
 		_sneakMeter.enabled = ini.GetBoolValue("SneakMeter", "bEnabled", true);
 
 		// --- Map Vanilla HUD Elements ---

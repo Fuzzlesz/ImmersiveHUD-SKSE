@@ -1,6 +1,6 @@
 #pragma once
 
-	class Settings : public ISingleton<Settings>
+class Settings : public ISingleton<Settings>
 {
 public:
 	static constexpr long kCacheVersion = 2; 
@@ -23,6 +23,7 @@ public:
 	{
 		bool enabled{ true };
 		bool hideWhileAiming{ false };
+		bool hideWhileSneaking{ false };
 	};
 
 	struct SneakMeterSettings

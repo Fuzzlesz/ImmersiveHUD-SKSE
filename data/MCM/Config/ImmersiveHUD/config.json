@@ -89,17 +89,13 @@
           }
         },
         {
-          "help": "$fzIH_HelpContextOpMin",
-          "id": "fContextOpacityMin:HUD",
-          "text": "$fzIH_ContextOpMin",
-          "type": "slider",
+          "help": "$fzIH_HelpCrosshairSneak",
+          "id": "bHideWhileSneaking:Crosshair",
+          "text": "$fzIH_CrosshairSneak",
+          "type": "toggle",
           "valueOptions": {
-            "defaultValue": 0,
-            "formatString": "{0}%",
-            "max": 100,
-            "min": 0,
-            "sourceType": "ModSettingFloat",
-            "step": 1
+            "defaultValue": false,
+            "sourceType": "ModSettingBool"
           }
         },
         {
@@ -117,12 +113,12 @@
           }
         },
         {
-          "help": "$fzIH_HelpContextOpMax",
-          "id": "fContextOpacityMax:HUD",
-          "text": "$fzIH_ContextOpMax",
+          "help": "$fzIH_HelpContextOpMin",
+          "id": "fContextOpacityMin:HUD",
+          "text": "$fzIH_ContextOpMin",
           "type": "slider",
           "valueOptions": {
-            "defaultValue": 100,
+            "defaultValue": 0,
             "formatString": "{0}%",
             "max": 100,
             "min": 0,
@@ -145,7 +141,18 @@
           }
         },
         {
-          "type": "empty"
+          "help": "$fzIH_HelpContextOpMax",
+          "id": "fContextOpacityMax:HUD",
+          "text": "$fzIH_ContextOpMax",
+          "type": "slider",
+          "valueOptions": {
+            "defaultValue": 100,
+            "formatString": "{0}%",
+            "max": 100,
+            "min": 0,
+            "sourceType": "ModSettingFloat",
+            "step": 1
+          }
         },
         {
           "help": "$fzIH_HelpHUDOpMin",

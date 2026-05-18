@@ -392,14 +392,22 @@ void HUDManager::Update(float a_delta)
 
 	// Crosshair Target Alpha
 	float targetCtx = ctxMin;
+	bool blockSmoothCam = false;
+
 	if (settings->GetCrosshairSettings().enabled) {
 		bool isHiddenByAiming = settings->GetCrosshairSettings().hideWhileAiming && isActionActive;
+		bool isHiddenBySneaking = settings->GetCrosshairSettings().hideWhileSneaking && isSneaking;
 
 		// Visibility Authority: Merge contextual states.
-		bool shouldDrawCrosshair = (isActionActive || isLookActive) && !isHiddenByAiming;
+		bool shouldDrawCrosshair = (isActionActive || isLookActive);
 
-		// Alpha Calculation
-		if (isHiddenByAiming) {
+		// SmoothCam Block Logic:
+		// We block SmoothCam if we want to hide it explicitly (aiming), or if there's no reason to draw at all.
+		// We DO NOT block SmoothCam just because we are sneaking (since it draws its arc/3D crosshair in worldspace).
+		blockSmoothCam = isHiddenByAiming || !shouldDrawCrosshair;
+
+		// Alpha Calculation for 2D HUD Crosshair:
+		if (isHiddenByAiming || isHiddenBySneaking) {
 			targetCtx = 0.0f;
 		} else if (shouldDrawCrosshair) {
 			if (isTDM) {
@@ -419,11 +427,12 @@ void HUDManager::Update(float a_delta)
 	} else {
 		// If Contextual Crosshair is disabled in settings, link it to the global toggle
 		targetCtx = _targetAlpha;
+		blockSmoothCam = (targetCtx <= 0.01f);
 	}
 
 	// SmoothCam API: Request control (block) to hide, release (unblock) to draw
 	if (isSmoothCam && !shouldHide) {
-		compat->ManageSmoothCamCrosshairControl(targetCtx <= 0.01f);
+		compat->ManageSmoothCamCrosshairControl(blockSmoothCam);
 	}
 
 	// Sneak Meter Target Alpha
