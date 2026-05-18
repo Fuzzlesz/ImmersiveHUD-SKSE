@@ -66,7 +66,7 @@ bool Compat::IsSkyHUDAltChargeEnabled() const
 	return _skyHUDAltCharge;
 }
 
-void Compat::ManageSmoothCamControl(bool a_shouldBlock)
+void Compat::ManageSmoothCamCrosshairControl(bool a_shouldBlock)
 {
 	if (!g_SmoothCam) {
 		return;
@@ -81,12 +81,6 @@ void Compat::ManageSmoothCamControl(bool a_shouldBlock)
 				_hasSmoothCamCrosshairControl = true;
 			}
 		}
-		if (!_hasSmoothCamStealthControl) {
-			auto res = g_SmoothCam->RequestStealthMeterControl(handle);
-			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
-				_hasSmoothCamStealthControl = true;
-			}
-		}
 	} else {
 		if (_hasSmoothCamCrosshairControl) {
 			auto res = g_SmoothCam->ReleaseCrosshairControl(handle);
@@ -94,6 +88,25 @@ void Compat::ManageSmoothCamControl(bool a_shouldBlock)
 				_hasSmoothCamCrosshairControl = false;
 			}
 		}
+	}
+}
+
+void Compat::ManageSmoothCamStealthControl(bool a_shouldBlock)
+{
+	if (!g_SmoothCam) {
+		return;
+	}
+
+	auto handle = SKSE::GetPluginHandle();
+
+	if (a_shouldBlock) {
+		if (!_hasSmoothCamStealthControl) {
+			auto res = g_SmoothCam->RequestStealthMeterControl(handle);
+			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::AlreadyGiven) {
+				_hasSmoothCamStealthControl = true;
+			}
+		}
+	} else {
 		if (_hasSmoothCamStealthControl) {
 			auto res = g_SmoothCam->ReleaseStealthMeterControl(handle);
 			if (res == SmoothCamAPI::APIResult::OK || res == SmoothCamAPI::APIResult::NotOwner) {
@@ -101,6 +114,16 @@ void Compat::ManageSmoothCamControl(bool a_shouldBlock)
 			}
 		}
 	}
+}
+
+bool Compat::HasSmoothCamCrosshairControl() const
+{
+	return _hasSmoothCamCrosshairControl;
+}
+
+bool Compat::HasSmoothCamStealthControl() const
+{
+	return _hasSmoothCamStealthControl;
 }
 
 bool Compat::IsTDMActive()

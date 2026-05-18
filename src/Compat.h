@@ -10,7 +10,8 @@ class Compat : public ISingleton<Compat>
 public:
 	// Initialization
 	void InitExternalData();
-	void ManageSmoothCamControl(bool a_shouldBlock);
+	void ManageSmoothCamCrosshairControl(bool a_shouldBlock);
+	void ManageSmoothCamStealthControl(bool a_shouldBlock);
 
 	// Compatibility Checks
 	bool IsTDMActive();
@@ -19,6 +20,8 @@ public:
 	bool IsBTPSActive();
 	bool IsIFPVActive();
 	bool IsFakeFirstPerson();
+	bool HasSmoothCamCrosshairControl() const;
+	bool HasSmoothCamStealthControl() const;
 
 	// External Control Logic
 	bool IsImmersiveHUDDisabled();

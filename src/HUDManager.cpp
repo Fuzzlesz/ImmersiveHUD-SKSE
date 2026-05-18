@@ -304,7 +304,8 @@ void HUDManager::Update(float a_delta)
 	if (compat->IsImmersiveHUDDisabled()) {
 		// Release SmoothCam control if we had it
 		if (compat->g_SmoothCam) {
-			compat->ManageSmoothCamControl(false);
+			compat->ManageSmoothCamCrosshairControl(false);
+			compat->ManageSmoothCamStealthControl(false);
 		}
 
 		if (!_wasHidden) {
@@ -397,11 +398,6 @@ void HUDManager::Update(float a_delta)
 		// Visibility Authority: Merge contextual states.
 		bool shouldDrawCrosshair = (isActionActive || isLookActive) && !isHiddenByAiming;
 
-		// SmoothCam API: Request control (block) to hide, release (unblock) to draw
-		if (isSmoothCam && !shouldHide) {
-			compat->ManageSmoothCamControl(!shouldDrawCrosshair);
-		}
-
 		// Alpha Calculation
 		if (isHiddenByAiming) {
 			targetCtx = 0.0f;
@@ -423,6 +419,11 @@ void HUDManager::Update(float a_delta)
 	} else {
 		// If Contextual Crosshair is disabled in settings, link it to the global toggle
 		targetCtx = _targetAlpha;
+	}
+
+	// SmoothCam API: Request control (block) to hide, release (unblock) to draw
+	if (isSmoothCam && !shouldHide) {
+		compat->ManageSmoothCamCrosshairControl(targetCtx <= 0.01f);
 	}
 
 	// Sneak Meter Target Alpha
@@ -490,6 +491,10 @@ void HUDManager::Update(float a_delta)
 		sneakFadeSpeed = 16.0f;  // Fast-fade exit
 	}
 
+	if (isSmoothCam && !shouldHide) {
+		compat->ManageSmoothCamStealthControl(targetSneak <= 0.01f);
+	}
+
 	// Enchantment Target Logic
 	const bool weaponsActive = isWeaponDrawn;
 	const bool leftEnch = compat->HasEnchantedWeapon(true);
@@ -508,7 +513,8 @@ void HUDManager::Update(float a_delta)
 	// 2. Handle Hidden State & Transitions
 	if (shouldHide && a_delta > 0.0f) {
 		_wasHidden = true;
-		compat->ManageSmoothCamControl(true);
+		compat->ManageSmoothCamCrosshairControl(true);
+		compat->ManageSmoothCamStealthControl(true);
 		SKSE::GetTaskInterface()->AddUITask([this]() { ApplyAlphaToHUD(0.0f); });
 		return;
 	}
@@ -561,10 +567,15 @@ void HUDManager::Update(float a_delta)
 		UpdateLinear(_lockedOnAlpha, targetLockedOn);
 
 		// Crosshair: Lerp Math (Smooth Feel)
-		float ctxSpeed = (targetCtx > _ctxAlpha) ? speedIn : speedOut;
-		_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * ctxSpeed);
-		if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
-			_ctxAlpha = targetCtx;
+		if (isSmoothCam && !compat->HasSmoothCamCrosshairControl()) {
+			// SmoothCam is drawing its own crosshair; force our internal alpha to 0 so we don't blip on shot release
+			_ctxAlpha = 0.0f;
+		} else {
+			float ctxSpeed = (targetCtx > _ctxAlpha) ? speedIn : speedOut;
+			_ctxAlpha = std::lerp(_ctxAlpha, targetCtx, a_delta * ctxSpeed);
+			if (std::abs(_ctxAlpha - targetCtx) < 0.1f) {
+				_ctxAlpha = targetCtx;
+			}
 		}
 
 		// Stealth Meter: Mixed Math depending on mode
@@ -964,6 +975,8 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 
 	// Immediate state checks for Visibility Hammer logic
 	const bool isSneaking = player && player->IsSneaking();
+	const bool isSmoothCam = compat->IsSmoothCamActive();
+	const bool hasSmoothCamCrosshairControl = compat->HasSmoothCamCrosshairControl();
 
 	// Local set to track paths processed in this frame and prevent growth leaks
 	std::unordered_set<std::string> processedPaths;
@@ -1157,9 +1170,6 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			} else {
 				if (isCrosshair) {
 					float ctxBased = (menuOpen ? 0.0f : _ctxAlpha);
-					if (compat->IsSmoothCamActive() && ctxBased > 0.01f) {
-						ctxBased = 0.01f;
-					}
 					targetAlpha = ctxBased;
 					shouldBeVisible = (targetAlpha > 0.0);
 				} else {
@@ -1173,14 +1183,17 @@ void HUDManager::ApplyHUDMenuSpecifics(RE::GPtr<RE::GFxMovieView> a_movie, float
 			// If we force SetVisible(true), we show both. We rely on Alpha to hide.
 			bool changed = false;
 
+			// Check API owner: If we DO NOT have control, SmoothCam manages the alpha & visibility.
+			bool skipCrosshairEnforcement = isCrosshair && isSmoothCam && !hasSmoothCamCrosshairControl;
+
 			if (!isCompass && !isShoutMeter) {
-				if (dInfo.GetVisible() != shouldBeVisible) {
+				if (!skipCrosshairEnforcement && dInfo.GetVisible() != shouldBeVisible) {
 					dInfo.SetVisible(shouldBeVisible);
 					changed = true;
 				}
 			}
 
-			if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
+			if (!skipCrosshairEnforcement && std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
 				dInfo.SetAlpha(targetAlpha);
 				changed = true;
 			}
