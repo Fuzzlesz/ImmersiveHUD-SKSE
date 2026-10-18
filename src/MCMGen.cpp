@@ -456,6 +456,14 @@ namespace MCMGen
 				finalWidgetsMap[finalID] = CreateEnum(displayName, finalID, help);
 			}
 
+			if (allPaths.contains("TrueHUD")) {
+				const std::string lootKey = "iMode_TrueHUDRecentLoot";
+				if (!iniLoaded || !ini.GetValue("Widgets", lootKey.c_str(), nullptr)) {
+					newIniKeysWidgets.push_back(lootKey);
+				}
+				finalWidgetsMap[lootKey + ":Widgets"] = CreateEnum("$fzIH_ElemTrueHUDRecentLoot", lootKey + ":Widgets", "Source: " + allPaths["TrueHUD"]);
+			}
+
 			// 7. Calculate Status Flags
 			// If new content is discovered during Initial/Mid Scans (!Runtime),
 			// we flag the session to display the "Restart Required" warning.

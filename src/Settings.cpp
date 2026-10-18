@@ -75,6 +75,7 @@ void Settings::Load()
 				_widgetPathToMode[path] = mode;
 			}
 		}
+		_widgetPathToMode["_root.TrueHUD.TrueHUD_PartialVisibilityWidgets"] = ini.GetLongValue("Widgets", "iMode_TrueHUDRecentLoot", 1);
 
 		// --- Cache Dynamic Widget Settings ---
 		// We read all keys in "Widgets" to match source files later

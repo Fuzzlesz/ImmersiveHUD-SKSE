@@ -1362,6 +1362,51 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 	const float lockedOnAlpha = menuOpen ? 0.0f : _lockedOnAlpha;
 	const float hudMax = settings->GetHUDOpacityMax();
 
+	auto applyMode = [&](RE::GFxValue& a_target, int a_mode, bool a_enforceVisible) {
+		// Menus active: relinquish control of external menus.
+		// Important for mod-added system menus, and widgets open during vanilla menus.
+		if (menuOpen && a_mode != Settings::kHidden && !isConsoleOpen) {
+			return;
+		}
+
+		// Handle passive ignore for external menus.
+		if (a_mode == Settings::kIgnored && a_enforceVisible) {
+			EnforceIgnoredVisibility(a_target);
+			return;
+		}
+
+		// For other modes, we set the target alpha blindly; Ignored here only restores full alpha
+		RE::GFxValue::DisplayInfo dInfo;
+		a_target.GetDisplayInfo(&dInfo);
+
+		double targetAlpha = a_alpha;
+
+		if (a_mode == Settings::kIgnored) {
+			targetAlpha = 100.0;
+		} else if (a_mode == Settings::kVisible) {
+			targetAlpha = hudMax;
+		} else if (a_mode == Settings::kHidden) {
+			targetAlpha = 0.0;
+		} else if (a_mode == Settings::kInterior) {
+			targetAlpha = interiorAlpha;
+		} else if (a_mode == Settings::kExterior) {
+			targetAlpha = exteriorAlpha;
+		} else if (a_mode == Settings::kInCombat) {
+			targetAlpha = combatAlpha;
+		} else if (a_mode == Settings::kNotInCombat) {
+			targetAlpha = notInCombatAlpha;
+		} else if (a_mode == Settings::kWeaponDrawn) {
+			targetAlpha = weaponAlpha;
+		} else if (a_mode == Settings::kLockedOn) {
+			targetAlpha = lockedOnAlpha;
+		}
+
+		if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
+			dInfo.SetAlpha(targetAlpha);
+			a_target.SetDisplayInfo(dInfo);
+		}
+	};
+
 	for (auto& [name, entry] : ui->menuMap) {
 		if (!entry.menu || !entry.menu->uiMovie) {
 			continue;
@@ -1382,50 +1427,39 @@ void HUDManager::ApplyAlphaToHUD(float a_alpha)
 
 		int mode = settings->GetWidgetMode(menuNameStr);
 
-		// Menus active: relinquish control of external menus.
-		// Important for mod-added system menus, and widgets open during vanilla menus.
-		if (menuOpen && mode != Settings::kHidden && !isConsoleOpen) {
-			continue;
-		}
-
 		RE::GFxValue root;
 		if (!entry.menu->uiMovie->GetVariable(&root, "_root")) {
 			continue;
 		}
 
-		// Handle passive ignore for external menus.
-		if (mode == Settings::kIgnored) {
-			EnforceIgnoredVisibility(root);
+		RE::GFxValue mainContainer;
+		RE::GFxValue lootContainer;
+		const auto& movie = entry.menu->uiMovie;
+		if (menuNameStr != "TrueHUD" ||
+			!movie->GetVariable(&mainContainer, "_root.TrueHUD.TrueHUD_MainVisibilityWidgets") ||
+			!movie->GetVariable(&lootContainer, "_root.TrueHUD.TrueHUD_PartialVisibilityWidgets")) {
+			applyMode(root, mode, true);
 			continue;
 		}
 
-		// For other modes, we set the target alpha blindly
-		RE::GFxValue::DisplayInfo dInfo;
-		root.GetDisplayInfo(&dInfo);
+		/**
+		 * Recent Loot is a child of _root.TrueHUD and alpha multiplies, so fade
+		 * the containers instead. TrueHUD toggles their _visible itself.
+		 */
+		applyMode(root, Settings::kIgnored, false);
+		applyMode(mainContainer, mode, false);
+		applyMode(lootContainer, settings->GetWidgetMode("_root.TrueHUD.TrueHUD_PartialVisibilityWidgets"), false);
 
-		double targetAlpha = a_alpha;
-
-		if (mode == Settings::kVisible) {
-			targetAlpha = hudMax;
-		} else if (mode == Settings::kHidden) {
-			targetAlpha = 0.0;
-		} else if (mode == Settings::kInterior) {
-			targetAlpha = interiorAlpha;
-		} else if (mode == Settings::kExterior) {
-			targetAlpha = exteriorAlpha;
-		} else if (mode == Settings::kInCombat) {
-			targetAlpha = combatAlpha;
-		} else if (mode == Settings::kNotInCombat) {
-			targetAlpha = notInCombatAlpha;
-		} else if (mode == Settings::kWeaponDrawn) {
-			targetAlpha = weaponAlpha;
-		} else if (mode == Settings::kLockedOn) {
-			targetAlpha = lockedOnAlpha;
-		}
-
-		if (std::abs(dInfo.GetAlpha() - targetAlpha) > 0.01) {
-			dInfo.SetAlpha(targetAlpha);
-			root.SetDisplayInfo(dInfo);
+		// Never enumerate _root.TrueHUD itself: its widget vars keep dangling refs after removeMovieClip.
+		RE::GFxValue pluginContainers;
+		if (movie->GetVariable(&pluginContainers, "_root.TrueHUD.customWidgetContainers") && pluginContainers.IsObject()) {
+			pluginContainers.VisitMembers([&](const char*, const RE::GFxValue& a_val) {
+				if (!a_val.IsDisplayObject()) {
+					return;
+				}
+				RE::GFxValue container = a_val;
+				applyMode(container, mode, false);
+			});
 		}
 	}
 }
