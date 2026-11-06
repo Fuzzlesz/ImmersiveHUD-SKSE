@@ -6,11 +6,10 @@
 * [PowerShell](https://github.com/PowerShell/PowerShell/releases/latest)
 * [Vcpkg](https://github.com/microsoft/vcpkg)
 	* Add the environment variable `VCPKG_ROOT` with the value as the path to the folder containing vcpkg
-* [Visual Studio Community 2022](https://visualstudio.microsoft.com/)
+* [Visual Studio Community 2022 or 2026](https://visualstudio.microsoft.com/)
 	* Desktop development with C++
-* [CommonLibSSE](https://github.com/powerof3/CommonLibSSE/tree/dev)
-	* You need to build from the powerof3/dev branch
-	* Add this as as an environment variable `CommonLibSSEPath`
+* [CommonLibSSE-NG](https://github.com/alandtse/CommonLibSSE-NG/tree/ng)
+	* Included as a git submodule in `extern/CommonLibSSE-NG` (`ng` branch)
 
 ## Register Visual Studio as a Generator
 * Open `x64 Native Tools Command Prompt`
@@ -18,24 +17,23 @@
 * Close the cmd window
 
 ## Building
+A single DLL is built that supports Skyrim SE (1.5.97) and AE (1.6.x and 1.7.x); the runtime is detected at load time.
 ```
-git clone https://github.com/Fuzzlesz/ImmersiveHUD-SKSE.git
+git clone --recurse-submodules https://github.com/Fuzzlesz/ImmersiveHUD-SKSE.git
 cd ImmersiveHUD-SKSE
-# pull commonlib /extern to override the path settings
-git submodule init
-# to update submodules to checked in build
-git submodule update
+# or, in an existing clone:
+git submodule update --init --recursive
 ```
 
-### SSE
+### Visual Studio 2022
 ```
-cmake --preset vs2022-windows-vcpkg-se
+cmake --preset vs2022-windows-vcpkg
 cmake --build build --config Release
 ```
-### AE
+### Visual Studio 2026
 ```
-cmake --preset vs2022-windows-vcpkg-ae
-cmake --build buildae --config Release
+cmake --preset vs2026-windows-vcpkg
+cmake --build build --config Release
 ```
 ## License
 [MIT](LICENSE)

@@ -9,6 +9,7 @@
     {
       "name": "cmake-dev",
       "hidden": true,
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
         "CMAKE_CXX_FLAGS": "/EHsc /MP /W4 /external:anglebrackets /external:W0 $penv{CXXFLAGS}"
@@ -44,56 +45,39 @@
       "toolset": "v143"
     },
     {
-      "name": "se",
+      "name": "vs2026",
       "hidden": true,
-      "binaryDir": "${sourceDir}/build"
+      "generator": "Visual Studio 18 2026",
+      "toolset": "v145"
     },
     {
-      "name": "ae",
-      "hidden": true,
-      "binaryDir": "${sourceDir}/buildae",
-      "cacheVariables": {
-        "BUILD_SKYRIMAE": true
-      }
-    },
-    {
-      "name": "vr",
-      "hidden": true,
-      "binaryDir": "${sourceDir}/buildvr",
-      "cacheVariables": {
-        "BUILD_SKYRIMVR": true
-      }
-    },
-    {
-      "name": "vs2022-windows-vcpkg-se",
+      "name": "vs2022-windows-vcpkg",
       "inherits": [
         "cmake-dev",
         "vcpkg",
         "windows",
-        "vs2022",
-        "se"
+        "vs2022"
       ]
     },
     {
-      "name": "vs2022-windows-vcpkg-ae",
+      "name": "vs2026-windows-vcpkg",
       "inherits": [
         "cmake-dev",
         "vcpkg",
         "windows",
-        "vs2022",
-        "ae"
+        "vs2026"
       ]
     }
   ],
   "buildPresets": [
     {
-      "name": "vs2022-windows-vcpkg-ae",
-      "configurePreset": "vs2022-windows-vcpkg-ae",
+      "name": "vs2022-windows-vcpkg",
+      "configurePreset": "vs2022-windows-vcpkg",
       "configuration": "Release"
     },
     {
-      "name": "vs2022-windows-vcpkg-se",
-      "configurePreset": "vs2022-windows-vcpkg-se",
+      "name": "vs2026-windows-vcpkg",
+      "configurePreset": "vs2026-windows-vcpkg",
       "configuration": "Release"
     }
   ]

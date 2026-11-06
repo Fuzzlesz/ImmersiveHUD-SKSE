@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 set(NAME "ImmersiveHUD" CACHE STRING "")
 set(VERSION 3.2.2 CACHE STRING "")
-set(AE_VERSION 1)
-
-# ---- Options ----
-
-option(BUILD_SKYRIMAE "Build for Skyrim AE" OFF)
 
 # ---- Cache build vars ----
 
@@ -15,40 +10,11 @@ macro(set_from_environment VARIABLE)
 	endif ()
 endmacro()
 
-macro(find_commonlib_path)
-	if (CommonLibName AND NOT ${CommonLibName} STREQUAL "")
-		# Check extern
-		find_path(CommonLibPath
-		include/REL/Relocation.h
-		PATHS extern/${CommonLibName})
-		if (${CommonLibPath} STREQUAL "CommonLibPath-NOTFOUND")
-			#Check path
-			set_from_environment(${CommonLibName}Path)
-			set(CommonLibPath ${${CommonLibName}Path})
-		endif()
-	endif()
-endmacro()
-
 set_from_environment(VCPKG_ROOT)
-if(BUILD_SKYRIMAE)
-	add_compile_definitions(SKYRIM_AE)
-	add_compile_definitions(SKYRIM_SUPPORT_AE)
-	set(CommonLibName "CommonLibSSE")
-	set_from_environment(SkyrimAEPath)
-	set(SkyrimPath ${SkyrimAEPath})
-	set(SkyrimVersion "Skyrim AE")
-	set(VERSION ${VERSION}.${AE_VERSION})
-else()
-	set(CommonLibName "CommonLibSSE")
-	set_from_environment(Skyrim64Path)
-	set(SkyrimPath ${Skyrim64Path})
-	set(SkyrimVersion "Skyrim SSE")
-endif()
-find_commonlib_path()
-message(
-	STATUS
-	"Building ${NAME} ${VERSION} for ${SkyrimVersion} at ${SkyrimPath} with ${CommonLibName} at ${CommonLibPath}."
-)
+
+# CommonLibSSE-NG: one DLL for SE 1.5.97 and AE 1.6.x/1.7.x (runtime is detected at load time).
+set(CommonLibPath "${CMAKE_CURRENT_SOURCE_DIR}/extern/CommonLibSSE-NG")
+message(STATUS "Building ${NAME} ${VERSION} (SE/AE) with CommonLibSSE-NG at ${CommonLibPath}.")
 
 if (DEFINED VCPKG_ROOT)
 	set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
@@ -60,7 +26,6 @@ else ()
 	)
 endif ()
 
-set(Boost_USE_STATIC_RUNTIME OFF CACHE BOOL "")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "")
 
 # ---- Project ----
@@ -105,18 +70,24 @@ endif ()
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG OFF)
 
-set(Boost_USE_STATIC_LIBS ON)
-
 # ---- Dependencies ----
 
-if (DEFINED CommonLibPath AND NOT ${CommonLibPath} STREQUAL "" AND IS_DIRECTORY ${CommonLibPath})
-	add_subdirectory(${CommonLibPath} ${CommonLibName})
-else ()
+if (NOT EXISTS "${CommonLibPath}/CMakeLists.txt")
 	message(
 		FATAL_ERROR
-		"Variable ${CommonLibName}Path is not set or in extern/."
+		"CommonLibSSE-NG not found in extern/. Run: git submodule update --init --recursive"
 	)
-endif()
+endif ()
+
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ENABLE_SKYRIM_SE ON CACHE BOOL "" FORCE)
+set(ENABLE_SKYRIM_AE ON CACHE BOOL "" FORCE)
+set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
+add_subdirectory("${CommonLibPath}" CommonLibSSE EXCLUDE_FROM_ALL)
+if (NOT COMMAND target_commonlibsse_properties)
+	# Only the prebuilt path of CommonLibSSE-NG includes this helper; source builds need it explicitly.
+	include("${CommonLibPath}/cmake/CommonLibSSE.cmake")
+endif ()
 
 find_path(CLIB_UTIL_INCLUDE_DIRS "ClibUtil/detail/SimpleIni.h")
 
@@ -170,14 +141,15 @@ target_include_directories(
 	PRIVATE
 		${CMAKE_CURRENT_BINARY_DIR}/include
 		${CMAKE_CURRENT_SOURCE_DIR}/src
-		${CommonLibPath}/x64/Release
 		${CLIB_UTIL_INCLUDE_DIRS}
 )
 
-target_link_libraries(
+# Links CommonLibSSE-NG and generates SKSEPlugin_Version/SKSEPlugin_Query for all runtimes.
+target_commonlibsse_properties(
 	${PROJECT_NAME}
-	PRIVATE
-		${CommonLibName}::${CommonLibName}
+	NAME "ImmersiveHUD"
+	AUTHOR "Fuzzles"
+	USE_ADDRESS_LIBRARY
 )
 
 target_precompile_headers(

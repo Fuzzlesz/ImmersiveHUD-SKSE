@@ -279,14 +279,14 @@ bool Compat::IsPlayerCasting(RE::PlayerCharacter* a_player)
 	}
 
 	bool leftCasting = false;
-	if (auto* leftCaster = a_player->magicCasters[0]) {
+	if (auto* leftCaster = a_player->GetActorRuntimeData().magicCasters[0]) {
 		if (leftCaster->currentSpell) {
 			leftCasting = IsSpellContextual(leftCaster->currentSpell);
 		}
 	}
 
 	bool rightCasting = false;
-	if (auto* rightCaster = a_player->magicCasters[1]) {
+	if (auto* rightCaster = a_player->GetActorRuntimeData().magicCasters[1]) {
 		if (rightCaster->currentSpell) {
 			rightCasting = IsSpellContextual(rightCaster->currentSpell);
 		}
@@ -301,7 +301,7 @@ bool Compat::IsPlayerAttacking(RE::PlayerCharacter* a_player)
 		return false;
 	}
 
-	auto attackState = a_player->actorState1.meleeAttackState;
+	auto attackState = a_player->AsActorState()->GetAttackState();
 
 	for (bool isLeft : { false, true }) {
 		auto equipped = a_player->GetEquippedObject(isLeft);
